@@ -12,7 +12,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "backup": "node --no-warnings=ExperimentalWarning --import tsx server/cli.ts backup",
-    "user": "node --no-warnings=ExperimentalWarning --import tsx server/cli.ts user"
+    "user": "node --no-warnings=ExperimentalWarning --import tsx server/cli.ts user",
+    "import": "node --no-warnings=ExperimentalWarning --import tsx server/import-cli.ts"
   },
   "license": "UNLICENSED",
   "dependencies": {

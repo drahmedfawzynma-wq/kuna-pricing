@@ -39,7 +39,11 @@ To stop the background service: `./scripts/uninstall-mac.sh` (data and backups a
 ### First use
 
 1. Create the administrator account on the first screen.
-2. **Imports** → drop the Batchworks materials CSV and all recipe CSVs together (copies are in `sample-data/`) → review each preview → apply.
+2. Load the Batchworks materials and all recipes in one go (safe to run twice; existing products are skipped):
+   ```bash
+   cd ~/Documents/Projects/kuna-pricing && npm run import
+   ```
+   Or use **Imports** → drop the Batchworks materials CSV and all recipe CSVs together (copies are in `sample-data/`) → review each preview → apply.
 3. **Materials** → price anything flagged (Water has no price until you enter one).
 4. **Recipes** → finish items marked *Needs review* (water quantity, labour basis) → mark reviewed → approve.
 5. **Batch calculator**, **Pricing**, **Quotations** as needed.

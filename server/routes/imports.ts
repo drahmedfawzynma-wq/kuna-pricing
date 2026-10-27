@@ -131,7 +131,7 @@ export function registerImportRoutes(app: FastifyInstance) {
   });
 }
 
-function validateDecisions(d: any): CostingDecisions {
+export function validateDecisions(d: any): CostingDecisions {
   const schema = z.object({
     productCode: z.string().trim().min(1), productName: z.string().trim().min(1),
     referenceBatchQty: z.string().refine((s) => dec(s)?.gt(0), 'must be > 0'),
@@ -148,7 +148,7 @@ function validateDecisions(d: any): CostingDecisions {
   return v as CostingDecisions;
 }
 
-function applyMaterials(db: DB, me: SessionUser, importId: number, proposals: (MaterialProposal | any)[], kind: string) {
+export function applyMaterials(db: DB, me: SessionUser, importId: number, proposals: (MaterialProposal | any)[], kind: string) {
   let created = 0, priced = 0, skipped = 0, updated = 0;
   const source = kind === 'materials_csv' ? 'csv' : 'batchworks';
   for (const p of proposals) {
@@ -210,7 +210,7 @@ function ensureMaterial(db: DB, me: SessionUser, importId: number, name: string,
   return id;
 }
 
-function applyCosting(db: DB, me: SessionUser, importId: number, a: CostingAnalysis, d: CostingDecisions) {
+export function applyCosting(db: DB, me: SessionUser, importId: number, a: CostingAnalysis, d: CostingDecisions) {
   const parsed = a.parsed;
   let productId = db.get<Row>('SELECT id FROM products WHERE code = ?', d.productCode)?.id as number | undefined;
   if (!productId) {
