@@ -48,6 +48,7 @@ function PriceCalculator() {
   const settings = useLoad<any>('/api/settings');
   const [batchQty, setBatchQty] = useState(sp.get('batchQty') ?? '');
   const [formatId, setFormatId] = useState<number | ''>(sp.get('formatId') ? Number(sp.get('formatId')) : '');
+  const [volMl, setVolMl] = useState<number | null>(null);
   const [method, setMethod] = useState<'margin' | 'markup' | 'manual'>('margin');
   const [methodValue, setMethodValue] = useState('');
   const [manualPrice, setManualPrice] = useState('');
@@ -73,14 +74,21 @@ function PriceCalculator() {
     return () => clearTimeout(t);
   }, [sel.versionId, batchQty, formatId]);
 
-  const per = formatId ? 'package' : `${p?.outputUnit ?? 'L'}`;
-  const unitCost = result ? (formatId ? result.costPerPackage : result.costPerOutputUnit) : null;
+  const outU = p?.outputUnit ?? 'L';
+  const activeFormats = (p?.packagingFormats ?? []).filter((f: any) => !f.archived);
+  const fmtFill = (f: any) => { const q = Number(f.fillQty); return f.fillUnit === 'L' || f.fillUnit === 'kg' ? q * 1000 : q; };
+  const stdVolumes = parseVolumes(settings.data?.settings.sell_volumes ?? '500 mL, 1 L, 1.5 L', outU).filter((v) => !activeFormats.some((f: any) => f.fillQty && Math.abs(fmtFill(f) - v) < 1e-9));
+  const selFormat = activeFormats.find((f: any) => f.id === formatId);
+  const per = volMl ? volLabel(volMl, outU) : selFormat ? (selFormat.fillQty ? volLabel(fmtFill(selFormat), outU) : 'package') : outU;
+  const volCost = volMl && result?.costPerOutputUnit ? dec(result.costPerOutputUnit)!.times(volMl).div(1000).toFixed() : null;
+  const unitCost = result ? (volMl ? volCost : formatId ? result.costPerPackage : result.costPerOutputUnit) : null;
+  const volTooBig = !!(volMl && result?.sellableQty && dec(result.sellableQty)!.times(1000).lt(volMl));
   const priceRes = !unitCost ? null : method === 'margin' ? priceForMargin(unitCost, methodValue) : method === 'markup' ? priceForMarkup(unitCost, methodValue) : manualPrice ? { ok: true as const, value: dec(manualPrice)?.toDecimalPlaces(2).toFixed(2) ?? '' } : null;
   const price = priceRes?.ok ? priceRes.value : null;
   const m = price && unitCost ? marginPct(price, unitCost) : null;
   const mk = price && unitCost ? markupPct(price, unitCost) : null;
   const gp = price && unitCost ? grossProfit(price, unitCost) : null;
-  const units = result ? (formatId ? result.packagedUnits : result.sellableQty) : null;
+  const units = result ? (volMl ? (result.sellableQty ? dec(result.sellableQty)!.times(1000).div(volMl).floor().toFixed() : null) : formatId ? result.packagedUnits : result.sellableQty) : null;
   const contribution = gp && sellingCharges ? dec(gp)!.minus(dec(sellingCharges) ?? 0) : null;
   const dsAcq = ds.acq || price || '';
   const dsVat = ds.vat || settings.data?.settings.food_vat_pct || '';
@@ -93,16 +101,29 @@ function PriceCalculator() {
       <div className="stack">
         <Card title="1 · Kuna production cost">
           <div className="form-grid">
-            <Field label="Product"><select className="input" value={sel.productId ?? ''} onChange={(e) => { sel.setProductId(Number(e.target.value) || null); sel.setVersionId(null); setFormatId(''); setBatchQty(''); setMethodValue(''); }}>
+            <Field label="Product"><select className="input" value={sel.productId ?? ''} onChange={(e) => { sel.setProductId(Number(e.target.value) || null); sel.setVersionId(null); setFormatId(''); setVolMl(null); setBatchQty(''); setMethodValue(''); }}>
               <option value="">Select…</option>{sel.products.data.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>
             <Field label="Recipe version"><select className="input" value={sel.versionId ?? ''} disabled={!p} onChange={(e) => { sel.setVersionId(Number(e.target.value)); setBatchQty(''); }}>{p?.versions.map((v: any) => <option key={v.id} value={v.id}>v{v.versionNo} · {v.status}</option>)}</select></Field>
             <Field label={`Production scale (${p?.outputUnit ?? 'L'})`}><NumInput value={batchQty} onChange={setBatchQty} disabled={!p} /></Field>
-            <Field label="Sell as"><select className="input" value={formatId} disabled={!p} onChange={(e) => setFormatId(e.target.value ? Number(e.target.value) : '')}><option value="">Bulk, per {p?.outputUnit ?? 'L'}</option>{p?.packagingFormats.filter((f: any) => !f.archived).map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></Field>
+            <Field label="Sell as (volume per unit)" hint={volMl ? 'Product cost only: no packaging format for this volume yet. One is created when you propose the price.' : selFormat && !selFormat.components?.length ? 'This format has no packaging items yet (Recipes → Packaging).' : undefined}>
+              <select className="input" value={volMl ? `v:${volMl}` : formatId ? `f:${formatId}` : ''} disabled={!p} onChange={(e) => {
+                const v = e.target.value;
+                if (v.startsWith('v:')) { setVolMl(Number(v.slice(2))); setFormatId(''); }
+                else if (v.startsWith('f:')) { setFormatId(Number(v.slice(2))); setVolMl(null); }
+                else { setFormatId(''); setVolMl(null); }
+              }}>
+                <option value="">Bulk, per {outU}</option>
+                {[...activeFormats.filter((f: any) => f.fillQty).map((f: any) => ({ v: fmtFill(f), key: `f:${f.id}`, text: `${volLabel(fmtFill(f), outU)} · ${f.name}` })),
+                  ...stdVolumes.map((v) => ({ v, key: `v:${v}`, text: `${volLabel(v, outU)} (no packaging yet)` }))]
+                  .sort((a, b) => a.v - b.v).map((o) => <option key={o.key} value={o.key}>{o.text}</option>)}
+              </select>
+            </Field>
           </div>
           {err && <Alert tone="error">{err}</Alert>}
+          {volTooBig && <Alert tone="warn">The production scale is smaller than one {volLabel(volMl!, outU)} unit. Increase the production scale to price this volume.</Alert>}
           {result && <div style={{ marginTop: 12 }} className="row">
             <div><div className="muted small">Unit cost per {per}</div><div className="big-number tag-est">{sek(unitCost)}</div></div>
-            <div className="muted small">Batch {num(result.batchQty)} {result.outputUnit} · {num(units, 2)} sellable {formatId ? 'packages' : result.outputUnit} · total {sek(result.totalBatchCost)}</div>
+            <div className="muted small">Batch {num(result.batchQty)} {result.outputUnit} · {num(units, 2)} sellable {formatId || volMl ? `units of ${per}` : result.outputUnit} · total {sek(result.totalBatchCost)}</div>
             {!result.complete && <Alert tone="warn">Incomplete costing: {result.warnings.filter((w) => w.level !== 'info').slice(0, 3).map((w) => w.message).join(' ')} Prices cannot be approved until it is complete.</Alert>}
           </div>}
         </Card>
@@ -153,16 +174,26 @@ function PriceCalculator() {
                 <span className="lbl">Gross margin</span><span className="val"><strong className={target && m?.ok && dec(m.value)!.toDecimalPlaces(2).lt(target) ? 'w-error' : ''}>{m?.ok ? pct(m.value, 2) : '—'}</strong></span>
                 <span className="lbl">Markup</span><span className="val">{mk?.ok ? pct(mk.value, 2) : '—'}</span>
                 <span className="lbl">Estimated gross profit / {per}</span><span className="val">{sek(gp)}</span>
-                <span className="lbl">Estimated gross profit / batch ({num(units, 2)} {formatId ? 'pkg' : p?.outputUnit})</span><span className="val">{gp && units ? sek(dec(gp)!.times(units)) : '—'}</span>
+                <span className="lbl">Estimated gross profit / batch ({num(units, 2)} {formatId || volMl ? 'units' : p?.outputUnit})</span><span className="val">{gp && units ? sek(dec(gp)!.times(units)) : '—'}</span>
                 {contribution && <><span className="lbl">Contribution after selling charges / {per}</span><span className="val">{sek(contribution)}</span></>}
                 {target && <><span className="lbl">Target margin</span><span className="val">{pct(target)}</span></>}
               </div>
               {target && m?.ok && dec(m.value)!.toDecimalPlaces(2).lt(target) && <Alert tone="warn">Below the {pct(target)} target margin.</Alert>}
               {can('pricing.write') && (
-                <Button kind="primary" disabled={busy || !price || !sel.versionId} onClick={() => run(() => api.post('/api/prices', {
-                  recipeVersionId: sel.versionId, batchQty, packagingFormatId: formatId || null, priceUnit: formatId ? 'package' : 'output_unit',
-                  method, methodValue: method === 'manual' ? null : methodValue, price: method === 'manual' ? manualPrice : null, customerId: customerId || null, minQty, effectiveFrom, notes: notes || null,
-                }), 'Price proposed. Approve it in the price list.')}>Propose this price</Button>
+                <Button kind="primary" disabled={busy || !price || !sel.versionId || volTooBig} onClick={() => run(async () => {
+                  let fid: number | null = formatId || null;
+                  if (volMl) {
+                    const big = volMl >= 1000;
+                    const created = await api.post(`/api/products/${p.id}/packaging`, { name: volLabel(volMl, outU), fillQty: big ? String(volMl / 1000) : String(volMl), fillUnit: big ? outU : outU === 'kg' ? 'g' : 'mL', components: [], notes: 'Created from the price calculator. Add bottle, cap, label and carton under Recipes → Packaging.' });
+                    fid = created.id;
+                  }
+                  const r = await api.post('/api/prices', {
+                    recipeVersionId: sel.versionId, batchQty, packagingFormatId: fid, priceUnit: fid ? 'package' : 'output_unit',
+                    method, methodValue: method === 'manual' ? null : methodValue, price: method === 'manual' ? manualPrice : null, customerId: customerId || null, minQty, effectiveFrom, notes: notes || null,
+                  });
+                  if (volMl) { await sel.product.reload(); setVolMl(null); setFormatId(fid!); }
+                  return r;
+                }, 'Price proposed. Approve it in the price list.')}>Propose this price</Button>
               )}
               <div className="muted small">A proposal stores a costing snapshot. It only becomes the selling price when approved.</div>
             </div>
@@ -317,6 +348,10 @@ function Scenarios() {
   );
 }
 
+function volLabel(v: number, outputUnit: string) {
+  return v >= 1000 ? `${String(v / 1000).replace('.', ',')} ${outputUnit}` : `${v} ${outputUnit === 'kg' ? 'g' : 'mL'}`;
+}
+
 /** Parse "500 mL, 1 L, 1.5 L" into amounts in mL (or g for products sold per kg). */
 function parseVolumes(text: string, outputUnit: string): number[] {
   const out: number[] = [];
@@ -389,7 +424,8 @@ function VolumePricing({ product, versionId, batchQty, method, methodValue, cust
           const liquid = bulk?.costPerOutputUnit ? dec(bulk.costPerOutputUnit)!.times(v).div(1000) : null;
           const unitCost = f ? r?.costPerPackage ?? null : null;
           const pkgCost = f ? r?.packagingPerPackage ?? null : null;
-          const pr = unitCost && method !== 'manual' ? (method === 'margin' ? priceForMargin(unitCost, methodValue) : priceForMarkup(unitCost, methodValue)) : null;
+          const basis = f ? unitCost : liquid ? liquid.toFixed() : null;
+          const pr = basis && method !== 'manual' ? (method === 'margin' ? priceForMargin(basis, methodValue) : priceForMarkup(basis, methodValue)) : null;
           const approved = f ? (prices.data ?? []).find((x) => x.status === 'approved' && x.packagingFormatId === f.id && (x.customerId ?? null) === customerId && x.priceUnit === 'package') : null;
           const mNow = approved && unitCost ? marginPct(approved.price, unitCost) : null;
           const below = mNow?.ok && targetMargin ? dec(mNow.value)!.toDecimalPlaces(2).lt(targetMargin) : false;
