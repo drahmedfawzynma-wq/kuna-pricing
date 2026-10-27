@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { HttpError, requirePerm, userCan } from '../auth';
 import type { DB } from '../db';
 import { today } from '../db';
-import { audit, runCosting, saveCosting } from '../services';
+import { audit, findOrCreateVolumeFormat, runCosting, saveCosting, standardContainerItems } from '../services';
 import { marginPct, markupPct, priceForMargin, priceForMarkup } from '../../shared/pricing';
 import { dec, str } from '../../shared/decimal';
 
@@ -40,6 +40,10 @@ export const costingRequest = z.object({
   actualOutputQty: z.string().nullable().optional(),
   actualPackagedUnits: z.string().nullable().optional(),
   extraCosts: z.array(batchCost).max(30).optional(),
+  sellVolume: z.object({
+    qty: z.string().refine((v) => { const d = dec(v); return !!d && d.gt(0); }, 'volume must be > 0').transform((v) => str(dec(v))!),
+    unit: z.enum(['mL', 'L', 'g', 'kg']),
+  }).nullable().optional(),
 });
 
 function toReq(b: z.infer<typeof costingRequest>) {
@@ -56,6 +60,7 @@ function toReq(b: z.infer<typeof costingRequest>) {
     actualOutputQty: b.actualOutputQty || null,
     actualPackagedUnits: b.actualPackagedUnits || null,
     extraCosts: b.extraCosts?.length ? b.extraCosts : undefined,
+    sellVolume: b.packagingFormatId ? null : b.sellVolume ?? null,
   };
 }
 
@@ -99,6 +104,12 @@ export function registerCostingRoutes(app: FastifyInstance) {
     const { input, result, version } = runCosting(db, toReq(b));
     const id = saveCosting(db, me, 'estimate', b.name ?? null, input, result, version, b.packagingFormatId, b.notes);
     return { id, result };
+  });
+
+  app.get('/api/standard-container', async (req) => {
+    requirePerm(req, 'costs.read');
+    const c = standardContainerItems(db);
+    return { name: c.name, missing: c.missing, components: c.components.map((x) => ({ ...x, name: db.get<any>('SELECT name FROM materials WHERE id = ?', x.materialId)?.name })) };
   });
 
   app.get('/api/costings', async (req) => {
@@ -229,7 +240,14 @@ export function registerCostingRoutes(app: FastifyInstance) {
     const me = requirePerm(req, 'pricing.write');
     const b = priceBody.parse(req.body);
     if (b.priceOverrides && Object.keys(b.priceOverrides).length) throw new HttpError(400, 'Selling prices must be based on current material prices, not scenario prices. Update material prices first or keep this as a scenario.');
-    if (b.priceUnit === 'package' && !b.packagingFormatId) throw new HttpError(400, 'Choose a packaging format for a per-package price.');
+    if (b.priceUnit === 'package' && !b.packagingFormatId && b.sellVolume) {
+      const v = db.get<any>('SELECT product_id FROM recipe_versions WHERE id = ?', b.recipeVersionId);
+      if (!v) throw new HttpError(404, 'Recipe version not found.');
+      requirePerm(req, 'recipes.write');
+      b.packagingFormatId = findOrCreateVolumeFormat(db, me, v.product_id, b.sellVolume);
+      b.sellVolume = null;
+    }
+    if (b.priceUnit === 'package' && !b.packagingFormatId) throw new HttpError(400, 'Choose a packaging format or sales volume for a per-package price.');
     if (!dec(b.minQty) || dec(b.minQty)!.lte(0)) throw new HttpError(400, 'Minimum quantity must be greater than zero.');
     b.minQty = str(dec(b.minQty))!;
     if (b.actualOutputQty) throw new HttpError(400, 'Selling prices are based on estimated output, not actual batch output.');
@@ -258,7 +276,7 @@ export function registerCostingRoutes(app: FastifyInstance) {
     audit(db, me, 'selling_price', id, 'propose', `Proposed ${price} SEK per ${b.priceUnit === 'package' ? 'package' : version.output_unit} for ${version.product_name}`);
     const m = unitCost ? marginPct(price, unitCost) : null;
     const mk = unitCost ? markupPct(price, unitCost) : null;
-    return { id, price, unitCost, marginPct: m?.ok ? m.value : null, markupPct: mk?.ok ? mk.value : null, complete: result.complete };
+    return { id, price, unitCost, packagingFormatId: b.packagingFormatId ?? null, marginPct: m?.ok ? m.value : null, markupPct: mk?.ok ? mk.value : null, complete: result.complete };
   });
 
   app.post('/api/prices/:id/approve', async (req) => {

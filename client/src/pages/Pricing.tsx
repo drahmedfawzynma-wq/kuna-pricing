@@ -46,6 +46,7 @@ function PriceCalculator() {
   const sel = useProductSelection(Number(sp.get('versionId')) || null);
   const customers = useLoad<any[]>('/api/customers');
   const settings = useLoad<any>('/api/settings');
+  const container = useLoad<any>('/api/standard-container');
   const [batchQty, setBatchQty] = useState(sp.get('batchQty') ?? '');
   const [formatId, setFormatId] = useState<number | ''>(sp.get('formatId') ? Number(sp.get('formatId')) : '');
   const [volMl, setVolMl] = useState<number | null>(null);
@@ -69,26 +70,27 @@ function PriceCalculator() {
   useEffect(() => { if (settings.data && !vatPct) { setVatPct(settings.data.settings.default_vat_pct); setShowVat(settings.data.settings.show_vat_inclusive === '1'); } }, [settings.data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!sel.versionId) return;
-    const t = setTimeout(() => api.post('/api/costings/calculate', { recipeVersionId: sel.versionId, batchQty: batchQty || null, packagingFormatId: formatId || null })
+    const t = setTimeout(() => api.post('/api/costings/calculate', { recipeVersionId: sel.versionId, batchQty: batchQty || null, packagingFormatId: formatId || null, sellVolume: volMl ? toSellVolume(volMl, p?.outputUnit ?? 'L') : null })
       .then((r) => { setResult(r); setErr(null); if (!batchQty) setBatchQty(r.batchQty ?? ''); }).catch((e) => setErr(e.message)), 250);
     return () => clearTimeout(t);
-  }, [sel.versionId, batchQty, formatId]);
+  }, [sel.versionId, batchQty, formatId, volMl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const outU = p?.outputUnit ?? 'L';
   const activeFormats = (p?.packagingFormats ?? []).filter((f: any) => !f.archived);
   const fmtFill = (f: any) => { const q = Number(f.fillQty); return f.fillUnit === 'L' || f.fillUnit === 'kg' ? q * 1000 : q; };
-  const stdVolumes = parseVolumes(settings.data?.settings.sell_volumes ?? '500 mL, 1 L, 1.5 L', outU).filter((v) => !activeFormats.some((f: any) => f.fillQty && Math.abs(fmtFill(f) - v) < 1e-9));
+  const cName = container.data?.name ?? 'standard container';
+  const stdVolumes = parseVolumes(settings.data?.settings.sell_volumes ?? '500 mL, 1 L, 1.5 L', outU).filter((v) => !activeFormats.some((f: any) => f.fillQty && Math.abs(fmtFill(f) - v) < 1e-9 && sameContainer(f, container.data)));
   const selFormat = activeFormats.find((f: any) => f.id === formatId);
   const per = volMl ? volLabel(volMl, outU) : selFormat ? (selFormat.fillQty ? volLabel(fmtFill(selFormat), outU) : 'package') : outU;
-  const volCost = volMl && result?.costPerOutputUnit ? dec(result.costPerOutputUnit)!.times(volMl).div(1000).toFixed() : null;
-  const unitCost = result ? (volMl ? volCost : formatId ? result.costPerPackage : result.costPerOutputUnit) : null;
-  const volTooBig = !!(volMl && result?.sellableQty && dec(result.sellableQty)!.times(1000).lt(volMl));
+  const packaged = !!(formatId || volMl);
+  const unitCost = result ? (packaged ? result.costPerPackage : result.costPerOutputUnit) : null;
+  const tooSmall = result?.warnings.find((w) => w.code === 'zero_units');
   const priceRes = !unitCost ? null : method === 'margin' ? priceForMargin(unitCost, methodValue) : method === 'markup' ? priceForMarkup(unitCost, methodValue) : manualPrice ? { ok: true as const, value: dec(manualPrice)?.toDecimalPlaces(2).toFixed(2) ?? '' } : null;
   const price = priceRes?.ok ? priceRes.value : null;
   const m = price && unitCost ? marginPct(price, unitCost) : null;
   const mk = price && unitCost ? markupPct(price, unitCost) : null;
   const gp = price && unitCost ? grossProfit(price, unitCost) : null;
-  const units = result ? (volMl ? (result.sellableQty ? dec(result.sellableQty)!.times(1000).div(volMl).floor().toFixed() : null) : formatId ? result.packagedUnits : result.sellableQty) : null;
+  const units = result ? (packaged ? result.packagedUnits : result.sellableQty) : null;
   const contribution = gp && sellingCharges ? dec(gp)!.minus(dec(sellingCharges) ?? 0) : null;
   const dsAcq = ds.acq || price || '';
   const dsVat = ds.vat || settings.data?.settings.food_vat_pct || '';
@@ -105,7 +107,7 @@ function PriceCalculator() {
               <option value="">Select…</option>{sel.products.data.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>
             <Field label="Recipe version"><select className="input" value={sel.versionId ?? ''} disabled={!p} onChange={(e) => { sel.setVersionId(Number(e.target.value)); setBatchQty(''); }}>{p?.versions.map((v: any) => <option key={v.id} value={v.id}>v{v.versionNo} · {v.status}</option>)}</select></Field>
             <Field label={`Production scale (${p?.outputUnit ?? 'L'})`}><NumInput value={batchQty} onChange={setBatchQty} disabled={!p} /></Field>
-            <Field label="Sell as (volume per unit)" hint={volMl ? 'Product cost only: no packaging format for this volume yet. One is created when you propose the price.' : selFormat && !selFormat.components?.length ? 'This format has no packaging items yet (Recipes → Packaging).' : undefined}>
+            <Field label="Sell as (volume per unit)" hint={volMl ? `Filled in the ${cName}: ${(container.data?.components ?? []).map((c: any) => c.name).join(', ') || 'no items set'}. Saved as a format when you propose the price.` : selFormat && !selFormat.components?.length ? 'This format has no packaging items yet (Recipes → Packaging).' : undefined}>
               <select className="input" value={volMl ? `v:${volMl}` : formatId ? `f:${formatId}` : ''} disabled={!p} onChange={(e) => {
                 const v = e.target.value;
                 if (v.startsWith('v:')) { setVolMl(Number(v.slice(2))); setFormatId(''); }
@@ -114,16 +116,17 @@ function PriceCalculator() {
               }}>
                 <option value="">Bulk, per {outU}</option>
                 {[...activeFormats.filter((f: any) => f.fillQty).map((f: any) => ({ v: fmtFill(f), key: `f:${f.id}`, text: `${volLabel(fmtFill(f), outU)} · ${f.name}` })),
-                  ...stdVolumes.map((v) => ({ v, key: `v:${v}`, text: `${volLabel(v, outU)} (no packaging yet)` }))]
+                  ...stdVolumes.map((v) => ({ v, key: `v:${v}`, text: `${volLabel(v, outU)} in ${cName}` }))]
                   .sort((a, b) => a.v - b.v).map((o) => <option key={o.key} value={o.key}>{o.text}</option>)}
               </select>
             </Field>
           </div>
           {err && <Alert tone="error">{err}</Alert>}
-          {volTooBig && <Alert tone="warn">The production scale is smaller than one {volLabel(volMl!, outU)} unit. Increase the production scale to price this volume.</Alert>}
+          {container.data?.missing?.length > 0 && volMl && <Alert tone="warn">Standard container items not found in Materials: {container.data.missing.join(', ')}. Fix them under Settings.</Alert>}
+          {tooSmall && <Alert tone="warn">The production scale is smaller than one {per} unit. Increase the production scale to price this volume.</Alert>}
           {result && <div style={{ marginTop: 12 }} className="row">
             <div><div className="muted small">Unit cost per {per}</div><div className="big-number tag-est">{sek(unitCost)}</div></div>
-            <div className="muted small">Batch {num(result.batchQty)} {result.outputUnit} · {num(units, 2)} sellable {formatId || volMl ? `units of ${per}` : result.outputUnit} · total {sek(result.totalBatchCost)}</div>
+            <div className="muted small">Batch {num(result.batchQty)} {result.outputUnit} · {num(units, 2)} sellable {packaged ? `units of ${per}` : result.outputUnit} · total {sek(result.totalBatchCost)}</div>
             {!result.complete && <Alert tone="warn">Incomplete costing: {result.warnings.filter((w) => w.level !== 'info').slice(0, 3).map((w) => w.message).join(' ')} Prices cannot be approved until it is complete.</Alert>}
           </div>}
         </Card>
@@ -139,7 +142,7 @@ function PriceCalculator() {
             {method !== 'manual' ? <Field label={method === 'margin' ? 'Gross margin (%)' : 'Markup (%)'} hint={method === 'margin' ? 'Price = unit cost ÷ (1 − margin)' : 'Price = unit cost × (1 + markup)'} error={priceRes && !priceRes.ok ? priceRes.error : null}><NumInput value={methodValue} onChange={setMethodValue} /></Field>
               : <Field label={`Selling price per ${per} (SEK, excl. VAT)`}><NumInput value={manualPrice} onChange={setManualPrice} /></Field>}
             <Field label="Customer" hint="Blank = general price list"><select className="input" value={customerId} onChange={(e) => setCustomerId(e.target.value ? Number(e.target.value) : '')}><option value="">All customers</option>{customers.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
-            <Field label="Volume tier: from quantity" hint={`Minimum ${per === 'package' ? 'packages' : per} per order`}><NumInput value={minQty} onChange={setMinQty} /></Field>
+            <Field label="Volume tier: from quantity" hint={packaged ? `Minimum units of ${per} per order` : `Minimum ${per} per order`}><NumInput value={minQty} onChange={setMinQty} /></Field>
             <Field label="Effective from"><input type="date" className="input" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} /></Field>
             <Field label="Selling charges per unit (SEK)" hint="Delivery, commission… kept separate from gross margin."><NumInput value={sellingCharges} onChange={setSellingCharges} placeholder="optional" /></Field>
             <Field label="Notes"><input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
@@ -180,18 +183,12 @@ function PriceCalculator() {
               </div>
               {target && m?.ok && dec(m.value)!.toDecimalPlaces(2).lt(target) && <Alert tone="warn">Below the {pct(target)} target margin.</Alert>}
               {can('pricing.write') && (
-                <Button kind="primary" disabled={busy || !price || !sel.versionId || volTooBig} onClick={() => run(async () => {
-                  let fid: number | null = formatId || null;
-                  if (volMl) {
-                    const big = volMl >= 1000;
-                    const created = await api.post(`/api/products/${p.id}/packaging`, { name: volLabel(volMl, outU), fillQty: big ? String(volMl / 1000) : String(volMl), fillUnit: big ? outU : outU === 'kg' ? 'g' : 'mL', components: [], notes: 'Created from the price calculator. Add bottle, cap, label and carton under Recipes → Packaging.' });
-                    fid = created.id;
-                  }
+                <Button kind="primary" disabled={busy || !price || !sel.versionId || !!tooSmall} onClick={() => run(async () => {
                   const r = await api.post('/api/prices', {
-                    recipeVersionId: sel.versionId, batchQty, packagingFormatId: fid, priceUnit: fid ? 'package' : 'output_unit',
+                    recipeVersionId: sel.versionId, batchQty, packagingFormatId: formatId || null, sellVolume: volMl ? toSellVolume(volMl, outU) : null, priceUnit: packaged ? 'package' : 'output_unit',
                     method, methodValue: method === 'manual' ? null : methodValue, price: method === 'manual' ? manualPrice : null, customerId: customerId || null, minQty, effectiveFrom, notes: notes || null,
                   });
-                  if (volMl) { await sel.product.reload(); setVolMl(null); setFormatId(fid!); }
+                  if (volMl && r.packagingFormatId) { await sel.product.reload(); setVolMl(null); setFormatId(r.packagingFormatId); }
                   return r;
                 }, 'Price proposed. Approve it in the price list.')}>Propose this price</Button>
               )}
@@ -348,6 +345,17 @@ function Scenarios() {
   );
 }
 
+function toSellVolume(v: number, outputUnit: string) {
+  return v >= 1000 ? { qty: String(v / 1000), unit: outputUnit } : { qty: String(v), unit: outputUnit === 'kg' ? 'g' : 'mL' };
+}
+
+function sameContainer(f: any, c: any) {
+  if (!c) return false;
+  const a = (f.components ?? []).map((x: any) => `${x.materialId}:${Number(x.qtyPerPackage)}`).sort().join('|');
+  const b = (c.components ?? []).map((x: any) => `${x.materialId}:${Number(x.qtyPerPackage)}`).sort().join('|');
+  return a === b && a !== '';
+}
+
 function volLabel(v: number, outputUnit: string) {
   return v >= 1000 ? `${String(v / 1000).replace('.', ',')} ${outputUnit}` : `${v} ${outputUnit === 'kg' ? 'g' : 'mL'}`;
 }
@@ -371,43 +379,38 @@ function VolumePricing({ product, versionId, batchQty, method, methodValue, cust
   volumesSetting: string; targetMargin: string | null; onProductChanged: () => void; onPick: (formatId: number) => void;
 }) {
   const { can } = useAuth();
-  const small = product.outputUnit === 'kg' ? 'g' : 'mL';
-  const big = product.outputUnit;
+  const outU = product.outputUnit;
+  const small = outU === 'kg' ? 'g' : 'mL';
+  const container = useLoad<any>('/api/standard-container');
   const [extra, setExtra] = useState<number[]>([]);
   const [custom, setCustom] = useState('');
   const [results, setResults] = useState<Record<string, any>>({});
   const prices = useLoad<any[]>(`/api/prices?productId=${product.id}`);
   const { run, busy } = useAction();
+  const cName = container.data?.name ?? 'standard container';
   const formats = product.packagingFormats.filter((f: any) => !f.archived && f.fillQty);
   const fillSmall = (f: any) => { const q = Number(f.fillQty); return f.fillUnit === 'L' || f.fillUnit === 'kg' ? q * 1000 : q; };
-  const volumes = [...new Set([...parseVolumes(volumesSetting, product.outputUnit), ...extra, ...formats.map(fillSmall)])].sort((a, b) => a - b);
-  const label = (v: number) => (v >= 1000 ? `${String(v / 1000).replace('.', ',')} ${big}` : `${v} ${small}`);
-  const rows = volumes.flatMap((v) => {
-    const fs = formats.filter((f: any) => Math.abs(fillSmall(f) - v) < 1e-9);
-    return fs.length ? fs.map((f: any) => ({ v, f })) : [{ v, f: null as any }];
-  });
+  const volumes = [...new Set([...parseVolumes(volumesSetting, outU), ...extra])].sort((a, b) => a - b);
+  const rows: { key: string; v: number; f: any | null }[] = [
+    ...formats.map((f: any) => ({ key: `f:${f.id}`, v: fillSmall(f), f })),
+    ...volumes.filter((v) => !formats.some((f: any) => Math.abs(fillSmall(f) - v) < 1e-9 && sameContainer(f, container.data))).map((v) => ({ key: `v:${v}`, v, f: null })),
+  ].sort((a, b) => a.v - b.v);
 
   useEffect(() => {
+    if (!container.data) return;
     const t = setTimeout(async () => {
       const out: Record<string, any> = {};
-      const bulk = await api.post('/api/costings/calculate', { recipeVersionId: versionId, batchQty: batchQty || null }).catch((e) => ({ error: e.message }));
-      out.bulk = bulk;
-      await Promise.all(formats.map(async (f: any) => {
-        out[f.id] = await api.post('/api/costings/calculate', { recipeVersionId: versionId, batchQty: batchQty || null, packagingFormatId: f.id }).catch((e) => ({ error: e.message }));
+      await Promise.all(rows.map(async (r) => {
+        out[r.key] = await api.post('/api/costings/calculate', { recipeVersionId: versionId, batchQty: batchQty || null, packagingFormatId: r.f?.id ?? null, sellVolume: r.f ? null : toSellVolume(r.v, outU) }).catch((e) => ({ error: e.message }));
       }));
       setResults(out);
     }, 300);
     return () => clearTimeout(t);
-  }, [versionId, batchQty, JSON.stringify(formats.map((f: any) => [f.id, f.fillQty, f.components]))]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [versionId, batchQty, container.data, JSON.stringify(rows.map((r) => [r.key, r.f?.components]))]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const createFormat = async (v: number) => {
-    const r = await run(() => api.post(`/api/products/${product.id}/packaging`, { name: label(v), fillQty: v >= 1000 ? String(v / 1000) : String(v), fillUnit: v >= 1000 ? big : small, components: [], notes: 'Created from the price calculator. Add bottle, cap, label and carton under Recipes → Packaging.' }), `${label(v)} format created`);
-    if (r) onProductChanged();
-    return r?.id as number | undefined;
-  };
-  const propose = async (fid: number) => {
-    const r = await run(() => api.post('/api/prices', { recipeVersionId: versionId, batchQty: batchQty || null, packagingFormatId: fid, priceUnit: 'package', method, methodValue: method === 'manual' ? null : methodValue, price: null, customerId, minQty, effectiveFrom }), 'Price proposed. Approve it in the price list.');
-    if (r) prices.reload();
+  const propose = async (row: { v: number; f: any | null }) => {
+    const r = await run(() => api.post('/api/prices', { recipeVersionId: versionId, batchQty: batchQty || null, packagingFormatId: row.f?.id ?? null, sellVolume: row.f ? null : toSellVolume(row.v, outU), priceUnit: 'package', method, methodValue: method === 'manual' ? null : methodValue, price: null, customerId, minQty, effectiveFrom }), 'Price proposed. Approve it in the price list.');
+    if (r) { prices.reload(); if (!row.f) onProductChanged(); }
   };
 
   return (
@@ -418,33 +421,27 @@ function VolumePricing({ product, versionId, batchQty, method, methodValue, cust
       {method === 'manual' && <Alert tone="info">Choose a target margin or markup in section 2 to see suggested prices for every volume.</Alert>}
       <div className="table-wrap"><table className="table compact">
         <thead><tr><th>Volume</th><th className="num">Unit cost</th><th className="num">Suggested</th><th className="num">Approved</th><th className="num">Margin now</th><th></th></tr></thead>
-        <tbody>{rows.map(({ v, f }) => {
-          const r = f ? results[f.id] : null;
-          const bulk = results.bulk;
-          const liquid = bulk?.costPerOutputUnit ? dec(bulk.costPerOutputUnit)!.times(v).div(1000) : null;
-          const unitCost = f ? r?.costPerPackage ?? null : null;
-          const pkgCost = f ? r?.packagingPerPackage ?? null : null;
-          const basis = f ? unitCost : liquid ? liquid.toFixed() : null;
-          const pr = basis && method !== 'manual' ? (method === 'margin' ? priceForMargin(basis, methodValue) : priceForMarkup(basis, methodValue)) : null;
-          const approved = f ? (prices.data ?? []).find((x) => x.status === 'approved' && x.packagingFormatId === f.id && (x.customerId ?? null) === customerId && x.priceUnit === 'package') : null;
+        <tbody>{rows.map((row) => {
+          const r = results[row.key];
+          const unitCost = r?.costPerPackage ?? null;
+          const err = r && (r.error || (!r.costPerPackage && r.warnings?.find((w: any) => w.level === 'error')?.message));
+          const pr = unitCost && method !== 'manual' ? (method === 'margin' ? priceForMargin(unitCost, methodValue) : priceForMarkup(unitCost, methodValue)) : null;
+          const approved = row.f ? (prices.data ?? []).find((x) => x.status === 'approved' && x.packagingFormatId === row.f.id && (x.customerId ?? null) === customerId && x.priceUnit === 'package') : null;
           const mNow = approved && unitCost ? marginPct(approved.price, unitCost) : null;
           const below = mNow?.ok && targetMargin ? dec(mNow.value)!.toDecimalPlaces(2).lt(targetMargin) : false;
-          const err = f && r && (r.error || (!r.costPerPackage && r.warnings?.find((w: any) => w.level === 'error')?.message));
+          const productPart = r?.costPerPackage && r?.packagingPerPackage ? dec(r.costPerPackage)!.minus(r.packagingPerPackage) : null;
           return (
-            <tr key={`${v}-${f?.id ?? 'new'}`}>
-              <td><strong>{label(v)}</strong><div className="muted small">{f ? f.name : 'no format yet'}</div>{f && !f.components?.length && <Badge tone="warn">no packaging items</Badge>}</td>
-              <td className="num">{f ? (err ? <span className="w-error small">{err}</span> : <><strong className="tag-est">{sek(unitCost)}</strong><div className="muted small">{sek(r?.costPerPackage && r?.packagingPerPackage ? dec(r.costPerPackage)!.minus(r.packagingPerPackage) : null)} product + {sek(pkgCost)} pack</div></>)
-                : <span className="muted small" title="Product cost only, before packaging">{sek(liquid)} product only</span>}</td>
+            <tr key={row.key}>
+              <td><strong>{volLabel(row.v, outU)}</strong><div className="muted small">{row.f ? row.f.name : `in ${cName}`}</div>{row.f && !row.f.components?.length && <Badge tone="warn">no packaging items</Badge>}</td>
+              <td className="num">{err ? <span className="w-error small">{err}</span> : r ? <><strong className="tag-est">{sek(unitCost)}</strong><div className="muted small">{sek(productPart)} product + {sek(r.packagingPerPackage)} pack</div></> : '…'}</td>
               <td className="num">{pr?.ok ? <strong>{sek(pr.value)}</strong> : <span className="muted small">{pr && !pr.ok ? pr.error : '—'}</span>}</td>
               <td className="num">{approved ? sek(approved.price) : <span className="muted">—</span>}</td>
               <td className="num">{mNow?.ok ? <span className={below ? 'w-error' : ''}>{pct(mNow.value)}</span> : '—'}</td>
-              <td className="nowrap">{can('pricing.write') && (f
-                ? <><Button size="sm" kind="primary" disabled={busy || !pr?.ok || !r?.complete} title={!r?.complete ? 'Costing incomplete' : undefined} onClick={() => propose(f.id)}>Propose</Button>{' '}<Button size="sm" kind="ghost" onClick={() => onPick(f.id)}>Details</Button></>
-                : can('recipes.write') && <Button size="sm" disabled={busy} onClick={() => createFormat(v)} title={`Create a ${label(v)} format`}>Create format</Button>)}</td>
+              <td className="nowrap">{can('pricing.write') && <><Button size="sm" kind="primary" disabled={busy || !pr?.ok || !r?.complete} title={r && !r.complete ? 'Costing incomplete' : undefined} onClick={() => propose(row)}>Propose</Button>{row.f && <>{' '}<Button size="sm" kind="ghost" onClick={() => onPick(row.f.id)}>Details</Button></>}</>}</td>
             </tr>);
         })}</tbody>
       </table></div>
-      <div className="muted small" style={{ marginTop: 8 }}>Costs are recalculated from current material prices every time you open this page, so a price update shows here immediately as a new unit cost and a new margin against the approved price (red when below the target margin). Approved prices stay fixed until you propose and approve a new one. Volumes are set under Settings; a new format starts without packaging items, add them under Recipes → Packaging.</div>
+      <div className="muted small" style={{ marginTop: 8 }}>Every volume is filled in the {cName} ({(container.data?.components ?? []).map((c: any) => c.name).join(', ') || 'set the items under Settings'}). Costs are recalculated from current material prices each time, so a price update shows here immediately as a new unit cost and a new margin against the approved price (red when below the target margin). Approved prices stay fixed until you approve a new one.</div>
     </Card>
   );
 }

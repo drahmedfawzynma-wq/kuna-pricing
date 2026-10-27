@@ -85,6 +85,8 @@ export interface CostingRequest {
   batchQty?: string | null;
   yieldPctOverride?: string | null;
   packagingFormatId?: number | null;
+  /** Price one unit of this volume filled into the standard container (Settings). Ignored when packagingFormatId is set. */
+  sellVolume?: SellVolume | null;
   priceOverrides?: Record<number, string>;
   actualOutputQty?: string | null;
   actualPackagedUnits?: string | null;
@@ -96,7 +98,7 @@ export interface CostingRequest {
 export function runCosting(db: DB, req: CostingRequest): { input: CostingInput; result: CostingResult; version: Row } {
   const { v, ingredients, costItems } = loadRecipeVersion(db, req.recipeVersionId);
   const recipe = req.recipeOverride ? { ...req.recipeOverride, outputUnit: v.output_unit } : toRecipeForCosting(v, ingredients, costItems);
-  const packaging = loadPackaging(db, req.packagingFormatId);
+  const packaging = req.packagingFormatId ? loadPackaging(db, req.packagingFormatId) : req.sellVolume ? standardContainerPackaging(db, req.sellVolume).packaging : null;
   const ids = new Set<number>();
   recipe.ingredients.forEach((i) => i.materialId && ids.add(i.materialId));
   packaging?.components.forEach((c) => c.materialId && ids.add(c.materialId));
@@ -157,4 +159,48 @@ export function currentVersion(db: DB, productId: number): Row | undefined {
 
 export function getSetting(db: DB, key: string, fallback: string): string {
   return db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', key)?.value ?? fallback;
+}
+
+export interface SellVolume { qty: string; unit: 'mL' | 'L' | 'g' | 'kg' }
+
+export function volumeLabel(v: SellVolume) {
+  return `${v.qty.replace('.', ',')} ${v.unit}`;
+}
+
+/** The standard container (Settings) as packaging components: material codes, 1 of each per unit; "2 x code" for more. */
+export function standardContainerItems(db: DB): { components: { materialId: number; qtyPerPackage: string }[]; missing: string[]; name: string } {
+  const name = getSetting(db, 'standard_container_name', 'standard container');
+  const raw = getSetting(db, 'standard_container_items', '');
+  const components: { materialId: number; qtyPerPackage: string }[] = [];
+  const missing: string[] = [];
+  for (const part of raw.split(',').map((x) => x.trim()).filter(Boolean)) {
+    const m = /^(\d+(?:\.\d+)?)\s*[x×]\s*(.+)$/i.exec(part);
+    const code = (m ? m[2] : part).trim();
+    const mat = db.get<Row>('SELECT id FROM materials WHERE code = ? AND archived = 0', code);
+    if (!mat) missing.push(code);
+    else components.push({ materialId: mat.id, qtyPerPackage: m ? m[1] : '1' });
+  }
+  return { components, missing, name };
+}
+
+export function standardContainerPackaging(db: DB, v: SellVolume): { packaging: PackagingFormat; name: string; missing: string[] } {
+  const c = standardContainerItems(db);
+  const name = `${volumeLabel(v)} in ${c.name}`;
+  return { name, missing: c.missing, packaging: { name, fillQty: v.qty, fillUnit: v.unit, components: c.components } };
+}
+
+/** Reuse the product's format for this volume in the standard container, or create it. */
+export function findOrCreateVolumeFormat(db: DB, user: SessionUser | undefined, productId: number, v: SellVolume): number {
+  const { packaging, name, missing } = standardContainerPackaging(db, v);
+  if (missing.length) throw new HttpError(400, `Standard container items not found in Materials: ${missing.join(', ')}. Check Settings → Standard container.`);
+  const want = JSON.stringify(packaging.components.map((c) => [c.materialId, c.qtyPerPackage]).sort());
+  const candidates = db.all<Row>('SELECT * FROM packaging_formats WHERE product_id = ? AND archived = 0 AND fill_qty = ? AND fill_unit = ?', productId, v.qty, v.unit);
+  for (const f of candidates) {
+    const have = JSON.stringify(db.all<Row>('SELECT material_id, qty_per_package FROM packaging_components WHERE format_id = ?', f.id).map((c) => [c.material_id, c.qty_per_package]).sort());
+    if (have === want) return f.id;
+  }
+  const fid = db.run('INSERT INTO packaging_formats (product_id, name, fill_qty, fill_unit, notes) VALUES (?,?,?,?,?)', productId, name, v.qty, v.unit, 'Created from a sales volume in the price calculator.').lastInsertRowid;
+  for (const c of packaging.components) db.run('INSERT INTO packaging_components (format_id, material_id, qty_per_package) VALUES (?,?,?)', fid, c.materialId, c.qtyPerPackage);
+  audit(db, user, 'packaging_format', fid, 'create', `Created format "${name}" for a sales volume`);
+  return fid;
 }

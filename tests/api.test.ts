@@ -374,3 +374,25 @@ describe('batch-specific costs', () => {
     expect(v.body.costItems).toHaveLength(0); // recipe itself unchanged
   });
 });
+
+describe('sales volumes in the standard container', () => {
+  it('prices 500 mL of Citrus filled in the 1.5 L Tritan bottle and reuses the format', async () => {
+    const products = await call('admin', 'GET', '/api/products');
+    const citrus = products.body.find((p: any) => p.name === 'Citrus Concentrate');
+    const c = await call('admin', 'POST', '/api/costings/calculate', { recipeVersionId: citrus.currentVersion.id, sellVolume: { qty: '500', unit: 'mL' } });
+    expect(c.status).toBe(200);
+    expect(c.body.packagingPerPackage).toBe('139.558');
+    expect(c.body.packagedUnits).toBe('2');
+    expect(Number(c.body.costPerPackage).toFixed(2)).toBe((79.156 / 2 + 139.558).toFixed(2));
+    const p1 = await call('admin', 'POST', '/api/prices', { recipeVersionId: citrus.currentVersion.id, sellVolume: { qty: '500', unit: 'mL' }, priceUnit: 'package', method: 'margin', methodValue: '60' });
+    expect(p1.status).toBe(200);
+    const p2 = await call('admin', 'POST', '/api/prices', { recipeVersionId: citrus.currentVersion.id, sellVolume: { qty: '0.5', unit: 'L' }, priceUnit: 'package', method: 'margin', methodValue: '65' });
+    const p3 = await call('admin', 'POST', '/api/prices', { recipeVersionId: citrus.currentVersion.id, sellVolume: { qty: '500', unit: 'mL' }, priceUnit: 'package', method: 'margin', methodValue: '65' });
+    expect(p3.body.packagingFormatId).toBe(p1.body.packagingFormatId);
+    const prod = await call('admin', 'GET', `/api/products/${citrus.id}`);
+    const f = prod.body.packagingFormats.find((x: any) => x.id === p1.body.packagingFormatId);
+    expect(f.name).toBe('500 mL in 1.5 L Tritan bottle');
+    expect(f.components).toHaveLength(3);
+    expect(p2.status).toBe(200);
+  });
+});

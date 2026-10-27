@@ -11,6 +11,8 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   company_name: 'Kuna Group Sweden AB',
   company_address: '',
   sell_volumes: '500 mL, 1 L, 1.5 L',
+  standard_container_name: '1.5 L Tritan bottle',
+  standard_container_items: '1-5-l-tritan-bottle, external-packaging, extract-label',
   quotation_terms: 'Prices exclude VAT unless stated. Delivery charges are shown separately.',
 };
 

@@ -8,7 +8,7 @@ import { ROLE_LABELS, ROLES } from '../../../shared/permissions';
 const LABELS: Record<string, string> = {
   company_name: 'Company name', company_address: 'Company address (on quotations)', base_currency: 'Reporting currency', default_vat_pct: 'Default VAT (%)',
   food_vat_pct: 'Food VAT for retail suggestions (%)', show_vat_inclusive: 'Show VAT-inclusive prices by default', quotation_prefix: 'Quotation number prefix',
-  quotation_validity_days: 'Default quotation validity (days)', sell_volumes: 'Standard sales volumes (e.g. 500 mL, 1 L, 1.5 L)', quotation_terms: 'Quotation terms text',
+  quotation_validity_days: 'Default quotation validity (days)', sell_volumes: 'Standard sales volumes (e.g. 500 mL, 1 L, 1.5 L)', standard_container_name: 'Standard container name', standard_container_items: 'Standard container items (material codes, comma separated; "2 x code" for two)', quotation_terms: 'Quotation terms text',
 };
 
 export default function Settings() {
