@@ -396,3 +396,69 @@ describe('sales volumes in the standard container', () => {
     expect(p2.status).toBe(200);
   });
 });
+
+describe('outsourced production (partner batches)', () => {
+  let partnerId: number;
+  let pbId: number;
+  let ingredients: number;
+  it('partners: production manages them; quality sees no fee; sales has no access', async () => {
+    const p = await call('production', 'POST', '/api/partners', { name: 'Co-packer A (test)', feeBasis: 'per_output_qty', feeRate: '35' });
+    expect(p.status).toBe(200);
+    partnerId = p.body.id;
+    expect((await call('quality', 'POST', '/api/partners', { name: 'X' })).status).toBe(403);
+    const q = await call('quality', 'GET', '/api/partners');
+    expect(q.status).toBe(200);
+    expect(q.body.find((x: any) => x.id === partnerId).feeRate).toBeUndefined();
+    expect((await call('sales', 'GET', '/api/partners')).status).toBe(403);
+  });
+
+  it('plans a partner batch: partner fee and freight replace in-house costs; in-house comparison stored', async () => {
+    const calc = await call('production', 'POST', '/api/costings/calculate', { recipeVersionId: versionId, batchQty: '100' });
+    ingredients = Number(calc.body.sections.ingredients);
+    const r = await call('production', 'POST', '/api/partner-batches', { partnerId, productId, plannedQty: '100', freightOut: '650', freightBack: '900', inhouseExtraCosts: [{ category: 'labour', description: 'Shift', amount: '3200' }] });
+    expect(r.status).toBe(200);
+    pbId = r.body.id;
+    expect(r.body.partnerName).toBe('Co-packer A (test)');
+    expect(Number(r.body.estimate.result.totalBatchCost)).toBeCloseTo(ingredients + 3500 + 650 + 900, 6);
+    expect(r.body.estimate.result.sections.labour).toBe('0');
+    expect(Number(r.body.inhouse.result.totalBatchCost)).toBeCloseTo(ingredients + 3200, 6);
+    expect(r.body.inputs.length).toBeGreaterThan(0);
+    // Quality sees the batch but not its partner fee or costs.
+    const qb = await call('quality', 'GET', `/api/batches/${pbId}`);
+    expect(qb.body.partnerFeeRate).toBeUndefined();
+    expect(qb.body.inhouse).toBeUndefined();
+  });
+
+  it('cannot use the in-house actual cost routes or skip sending', async () => {
+    expect((await call('production', 'POST', `/api/batches/${pbId}/complete-costing`)).status).toBe(409);
+    expect((await call('production', 'PATCH', `/api/batches/${pbId}`, { status: 'in_production' })).status).toBe(409);
+    expect((await call('production', 'POST', `/api/partner-batches/${pbId}/receive`, { receivedDate: '2026-10-20', receivedQty: '96' })).status).toBe(409);
+  });
+
+  it('send records supplier lots; receive locks fee × received litres + freight at the prices frozen when sent', async () => {
+    const b = await call('production', 'GET', `/api/batches/${pbId}`);
+    const s = await call('production', 'POST', `/api/partner-batches/${pbId}/send`, { sentDate: '2026-10-12', lots: [{ inputId: b.body.inputs[0].id, lot: 'L-3301' }] });
+    expect(s.status).toBe(200);
+    expect(s.body.status).toBe('in_production');
+    expect(s.body.inputs[0].supplier_lot).toBe('L-3301');
+    // A later price change must not change what was sent.
+    await call('production', 'POST', `/api/materials/${materialId}/prices`, { effectiveDate: '2026-10-15', entryMode: 'per_unit', price: '999', currency: 'SEK' });
+    const r = await call('production', 'POST', `/api/partner-batches/${pbId}/receive`, { receivedDate: '2026-10-20', receivedQty: '96', partnerLot: 'CPA-1', freightBack: '1000', lock: true });
+    expect(r.status).toBe(200);
+    expect(r.body.costsLocked).toBe(true);
+    const total = ingredients + 35 * 96 + 650 + 1000;
+    expect(Number(r.body.actual.result.totalBatchCost)).toBeCloseTo(total, 6);
+    expect(Number(r.body.actual.result.costPerOutputUnit)).toBeCloseTo(total / 96, 6);
+    expect((await call('production', 'POST', `/api/partner-batches/${pbId}/receive`, { receivedDate: '2026-10-20', receivedQty: '90', lock: true })).status).toBe(409);
+  });
+
+  it('dashboard uses the partner batch as the latest actual cost', async () => {
+    const d = await call('admin', 'GET', '/api/dashboard');
+    const p = d.body.products.find((x: any) => x.id === productId);
+    expect(p.latestActual.partnerName).toBe('Co-packer A (test)');
+    expect(d.body.lockedBatches.length).toBeGreaterThan(0);
+    const s = await call('sales', 'GET', '/api/dashboard');
+    expect(s.body.products).toBeUndefined();
+    expect(s.body.partnerBatches).toBeUndefined();
+  });
+});

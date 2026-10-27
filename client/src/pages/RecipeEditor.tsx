@@ -233,7 +233,7 @@ function CostItemsEditor({ draft, editable, upd, outputUnit, result }: { draft: 
           const line = result?.lines.find((l: any) => l.ref === `cost-${i}`);
           return (
             <tr key={i} className={line?.status === 'missing' ? 'row-missing' : ''}>
-              <td><select className="input input-sm" disabled={!editable} value={c.category} onChange={(e) => set(i, 'category', e.target.value)}>{Object.entries(COST_CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></td>
+              <td><select className="input input-sm" disabled={!editable} value={c.category} onChange={(e) => set(i, 'category', e.target.value)}>{Object.entries(COST_CATEGORIES).filter(([k]) => k !== 'outsourcing' || c.category === k).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></td>
               <td><input className="input input-sm" disabled={!editable} value={c.description} onChange={(e) => set(i, 'description', e.target.value)} />{c.note && <div className="muted small">{c.note}</div>}</td>
               <td><select className="input input-sm" disabled={!editable} value={c.basis} onChange={(e) => set(i, 'basis', e.target.value)}>{Object.entries(COST_BASES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></td>
               <td style={{ width: 110 }}><NumInput className="input-sm" disabled={!editable} invalid={c.needsReview && !c.rate} value={c.rate} placeholder={c.basis === 'percent' ? '%' : 'SEK'} onChange={(x) => set(i, 'rate', x)} /></td>

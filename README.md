@@ -137,9 +137,24 @@ This runs well as a single-server application for one site. Before exposing it b
 * Run it as a service (launchd on macOS, systemd on Linux) and schedule backups.
 * For several sites or high concurrency, the plain-SQL data layer can be moved to PostgreSQL; the migrations are standard SQL.
 
+### Dashboard
+
+The start page compares, per product, the standard estimate (approved recipe at current reference prices) with the latest cost-locked batch, in-house or at a partner, and shows the margin of the approved bulk price at both. It also lists products below target margin, incomplete costings, recent batches with their cost difference, material prices changed in the last 90 days and partner batches that need action.
+
+### Outsourced production
+
+Partners (co-manufacturers) have a fee per L/kg received or per batch. A partner batch uses the approved recipe and goes through four steps:
+
+1. **Ingredients sent**: supplier lot numbers are typed in per ingredient; the ingredient values are frozen at the reference prices of that day.
+2. **Produced by partner** (optional): production date and the partner's batch reference.
+3. **Finished goods received**: accepted quantity, partner lot, CoA reference, expiry, final fee and freight. Locking calculates the actual cost: frozen ingredient values + fee (× accepted quantity when per L/kg) + freight + quality testing. Kuna's own labour, setup, equipment, overhead and consumable lines from the recipe are left out.
+4. **Quality release** on the batch record, as for in-house batches.
+
+An in-house estimate of the same batch is stored when the partner batch is planned, for a make-or-buy comparison. Stock levels are not tracked.
+
 ## Not yet implemented
 
-* Supplier lot receiving, stock movements, expiry-based (FEFO) allocation and dispatch blocking (tables exist: `material_lots`, `batch_inputs`; no UI yet).
+* Stock levels, supplier lot receiving with quantities, expiry-based (FEFO) allocation and dispatch blocking. Supplier lot numbers can be typed in per batch ingredient.
 * File attachments for quality results (a document reference field is stored instead).
 * Sub-recipes (intermediate extracts as ingredients) with circular-dependency checks.
 * Costing basis "actual purchase-lot cost" (current reference price and scenario prices are implemented).

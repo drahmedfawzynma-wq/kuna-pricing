@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { Alert, Badge, Button, Card, Empty, Field, Loading, Modal, NumInput, PageHeader, StatusBadge, useAction, useConfirm, useLoad } from '../ui';
@@ -20,10 +20,10 @@ export default function Batches() {
       {id ? <BatchDetail id={Number(id)} onChanged={list.reload} /> : (
         <Card pad={false}>
           {!list.data ? <Loading error={list.error} /> : list.data.length === 0 ? <Empty title="No batches yet" action={can('batches.write') && <Button kind="primary" onClick={() => setCreating(true)}>Plan batch</Button>}>Plan a batch from a recipe, or from the batch calculator.</Empty> : (
-            <table className="table"><thead><tr><th>Batch</th><th>Product</th><th className="num">Planned</th><th className="num">Actual output</th><th>Produced</th><th>Expiry</th>{can('costs.read') && <><th className="num"><span className="tag-est">Est.</span> cost/unit</th><th className="num"><span className="tag-act">Actual</span> cost/unit</th></>}<th>Status</th></tr></thead>
+            <table className="table"><thead><tr><th>Batch</th><th>Product</th><th>Made at</th><th className="num">Planned</th><th className="num">Actual output</th><th>Produced</th><th>Expiry</th>{can('costs.read') && <><th className="num"><span className="tag-est">Est.</span> cost/unit</th><th className="num"><span className="tag-act">Actual</span> cost/unit</th></>}<th>Status</th></tr></thead>
               <tbody>{list.data.map((b) => (
-                <tr key={b.id} className="clickable" onClick={() => nav(`/batches/${b.id}`)}>
-                  <td><strong>{b.batchNumber}</strong></td><td>{b.productName} <span className="muted small">v{b.versionNo}</span></td>
+                <tr key={b.id} className="clickable" onClick={() => nav(b.partnerId ? `/outsourced/${b.id}` : `/batches/${b.id}`)}>
+                  <td><strong>{b.batchNumber}</strong></td><td>{b.productName} <span className="muted small">v{b.versionNo}</span></td><td className="small">{b.partnerName ?? 'Kuna factory'}</td>
                   <td className="num">{qty(b.plannedQty, b.outputUnit)}</td><td className="num">{qty(b.actualOutputQty, b.outputUnit)}</td><td>{date(b.productionDate)}</td><td>{date(b.expiryDate)}</td>
                   {can('costs.read') && <><td className="num">{sek(b.estimatedCostPerUnit)}</td><td className="num">{sek(b.actualCostPerUnit)}</td></>}
                   <td><StatusBadge status={b.status} />{b.costsLocked && <Badge>costs locked</Badge>}</td>
@@ -66,8 +66,10 @@ function BatchDetail({ id, onChanged }: { id: number; onChanged: () => void }) {
   const confirm = useConfirm();
   const { data: b, error, setData, reload } = useLoad<any>(`/api/batches/${id}`);
   const [act, setAct] = useState<any>(null);
+  const [lots, setLots] = useState<Record<number, string>>({});
   const [qc, setQc] = useState<any>({ specId: '', parameter: '', valueText: '', result: '', notes: '', attachmentRef: '' });
   const { run, busy } = useAction();
+  useEffect(() => { if (b) setLots(Object.fromEntries(b.inputs.map((i: any) => [i.id, i.supplier_lot ?? '']))); }, [b]);
   useEffect(() => { if (b) setAct({ actualOutputQty: b.actualOutputQty ?? '', actualPackagedUnits: b.actualPackagedUnits ?? '', actualAdjustments: b.actualAdjustments ?? [], productionDate: b.productionDate ?? '', expiryDate: b.expiryDate ?? '' }); }, [b]);
   if (!b || !act) return <Loading error={error} />;
   const done = (r: any) => { if (r) { setData(r); onChanged(); } };
@@ -83,12 +85,12 @@ function BatchDetail({ id, onChanged }: { id: number; onChanged: () => void }) {
     <div className="stack">
       <Card title={<span className="row" style={{ gap: 8 }}>{b.batchNumber} <StatusBadge status={b.status} />{b.costsLocked && <Badge>costs locked</Badge>}</span>}
         actions={can('batches.write') && !closed && <>
-          {b.status === 'planned' && <Button size="sm" onClick={async () => done(await run(() => api.patch(`/api/batches/${id}`, { status: 'in_production' }), 'Status updated'))}>Start production</Button>}
+          {b.status === 'planned' && !b.partnerId && <Button size="sm" onClick={async () => done(await run(() => api.patch(`/api/batches/${id}`, { status: 'in_production' }), 'Status updated'))}>Start production</Button>}
           {b.status !== 'on_hold' && <Button size="sm" onClick={async () => done(await run(() => api.patch(`/api/batches/${id}`, { status: 'on_hold' }), 'Batch on hold'))}>Put on hold</Button>}
-          {b.status === 'on_hold' && <Button size="sm" onClick={async () => done(await run(() => api.patch(`/api/batches/${id}`, { status: 'in_production' }), 'Resumed'))}>Resume</Button>}
+          {b.status === 'on_hold' && <Button size="sm" onClick={async () => done(await run(() => api.patch(`/api/batches/${id}`, { status: b.partnerId && !b.sentDate ? 'planned' : 'in_production' }), 'Resumed'))}>Resume</Button>}
         </>}>
         <dl className="kv">
-          <dt>Product</dt><dd>{b.productName} · recipe v{b.versionNo}</dd><dt>Packaging</dt><dd>{b.packagingName ?? 'Bulk'}</dd>
+          <dt>Product</dt><dd>{b.productName} · recipe v{b.versionNo}</dd>{b.partnerId && <><dt>Made at</dt><dd>{b.partnerName} · <Link to={`/outsourced/${b.id}`}>partner batch steps and costs</Link></dd></>}<dt>Packaging</dt><dd>{b.packagingName ?? 'Bulk'}</dd>
           <dt>Planned</dt><dd>{qty(b.plannedQty, b.outputUnit)} at {num(b.plannedYieldPct, 2)} % expected yield</dd>
           <dt>Production / expiry</dt><dd>{date(b.productionDate)} / {date(b.expiryDate)}</dd>
           <dt>Quality approval</dt><dd>{b.qcApprovedAt ? `${dateTime(b.qcApprovedAt)} by ${b.qcApprovedByName}` : <span className="muted">not approved</span>}</dd>
@@ -98,7 +100,9 @@ function BatchDetail({ id, onChanged }: { id: number; onChanged: () => void }) {
 
       <div className="grid-2">
         <Card title="Actual production">
-          {b.costsLocked ? (
+          {b.partnerId ? (
+            <span className="muted">Made by {b.partnerName}. Ingredients sent, goods received and the actual cost are recorded under <Link to={`/outsourced/${b.id}`}>Outsourced production</Link>.{b.receivedDate && <> Received {qty(b.actualOutputQty, b.outputUnit)} on {date(b.receivedDate)}{b.partnerLot ? `, partner lot ${b.partnerLot}` : ''}{b.coaRef ? `, CoA ${b.coaRef}` : ''}.</>}</span>
+          ) : b.costsLocked ? (
             <dl className="kv"><dt>Accepted output</dt><dd>{qty(b.actualOutputQty, b.outputUnit)}</dd><dt>Packaged units</dt><dd>{num(b.actualPackagedUnits) ?? '—'}</dd>
               <dt>Extra actual costs</dt><dd>{b.actualAdjustments.length ? b.actualAdjustments.map((a: any) => `${a.label}: ${sek(a.amount)}`).join(', ') : 'none'}</dd></dl>
           ) : can('batches.write') ? (
@@ -169,10 +173,10 @@ function BatchDetail({ id, onChanged }: { id: number; onChanged: () => void }) {
         <p className="muted small" style={{ marginTop: 10 }}>The system records quality decisions; it does not by itself establish food-safety compliance. File attachments are not stored yet: record the document reference.</p>
       </Card>
 
-      <Card title="Ingredient traceability" pad={false}>
+      <Card title="Ingredient traceability" pad={false} actions={can('batches.write') && !closed && <Button size="sm" disabled={busy} onClick={async () => done(await run(() => api.put(`/api/batches/${id}/input-lots`, b.inputs.map((i: any) => ({ inputId: i.id, lot: lots[i.id]?.trim() || null }))), 'Lot numbers saved'))}>Save lot numbers</Button>}>
         <table className="table compact"><thead><tr><th>Material</th><th className="num">Planned quantity</th><th>Supplier lot</th></tr></thead>
-          <tbody>{b.inputs.map((i: any) => <tr key={i.id}><td>{i.material_name}</td><td className="num">{qty(i.planned_qty, i.unit)}</td><td>{i.supplier_lot ?? <span className="muted">not assigned</span>}</td></tr>)}</tbody></table>
-        <div className="card-body muted small">Planned inputs are recorded per batch. Assigning supplier lots, actual consumption and stock movements is prepared in the database but not yet available in the interface (phase 3).</div>
+          <tbody>{b.inputs.map((i: any) => <tr key={i.id}><td>{i.material_name}</td><td className="num">{qty(i.planned_qty, i.unit)}</td><td>{can('batches.write') && !closed ? <input className="input input-sm" style={{ maxWidth: 180 }} placeholder="Supplier lot" value={lots[i.id] ?? ''} onChange={(e) => setLots({ ...lots, [i.id]: e.target.value })} /> : (i.supplier_lot ?? <span className="muted">not recorded</span>)}</td></tr>)}</tbody></table>
+        <div className="card-body muted small">Type the supplier lot number used for each ingredient. Stock levels and actual consumption per lot are not tracked.</div>
       </Card>
     </div>
   );

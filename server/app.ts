@@ -14,6 +14,7 @@ import { registerCostingRoutes } from './routes/costings';
 import { registerSalesRoutes } from './routes/sales';
 import { registerBatchRoutes } from './routes/batches';
 import { registerDashboardRoutes } from './routes/dashboard';
+import { registerPartnerRoutes } from './routes/partners';
 import { seedBase } from './seed';
 
 export interface AppOptions {
@@ -72,6 +73,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   registerCostingRoutes(app);
   registerSalesRoutes(app);
   registerBatchRoutes(app);
+  registerPartnerRoutes(app);
   registerDashboardRoutes(app);
 
   app.all('/api/*', async () => {

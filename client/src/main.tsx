@@ -19,6 +19,7 @@ import QuotationEditor from './pages/QuotationEditor';
 import QuotationPrint from './pages/QuotationPrint';
 import Batches from './pages/Batches';
 import Settings from './pages/Settings';
+import Outsourced from './pages/Outsourced';
 
 
 function Login({ needsSetup, onDone }: { needsSetup: boolean; onDone: () => void }) {
@@ -45,7 +46,7 @@ function Login({ needsSetup, onDone }: { needsSetup: boolean; onDone: () => void
     <div className="login-wrap">
       <form className="card login" onSubmit={submit}>
         <div className="card-body stack">
-          <div className="row"><div className="brand-mark" style={{ color: '#fff', width: 34, height: 34, borderRadius: 8, display: 'grid', placeItems: 'center' }}>K</div>
+          <div className="row"><div className="brand-mark" style={{ width: 34, height: 34, borderRadius: 8, display: 'grid', placeItems: 'center' }}>K</div>
             <div><h1 style={{ fontSize: 18 }}>Kuna Production &amp; Pricing</h1><div className="muted small">{needsSetup ? 'First-time setup: create the administrator account' : 'Sign in'}</div></div></div>
           {needsSetup && <Field label="Your name"><input className="input" value={name} onChange={(e) => setName(e.target.value)} required /></Field>}
           <Field label="Email"><input className="input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
@@ -80,12 +81,13 @@ function Shell({ user, logout }: { user: Me; logout: () => void }) {
         <aside className="sidebar">
           <div className="brand"><div className="brand-mark">K</div><div><div className="brand-name">Kuna</div><div className="brand-sub">Production &amp; Pricing</div></div></div>
           <nav className="nav">
-            <NavLink to="/" end>Overview</NavLink>
+            <NavLink to="/" end>Dashboard</NavLink>
             {c('materials.read') && <div className="nav-section">Production</div>}
             {c('materials.read') && <NavLink to="/materials">Materials &amp; packaging</NavLink>}
             {c('recipes.read') && <NavLink to="/recipes">Recipes {reviewCount > 0 && <span className="nav-count" title="Records needing review">{reviewCount}</span>}</NavLink>}
             {c('costs.read') && <NavLink to="/calculator">Batch calculator</NavLink>}
             {c('batches.read') && <NavLink to="/batches">Production batches</NavLink>}
+            {c('batches.read') && <NavLink to="/outsourced">Outsourced production</NavLink>}
             {(c('pricing.read') || c('prices.read') || c('customers.read')) && <div className="nav-section">Commercial</div>}
             {(c('pricing.read') || c('prices.read')) && <NavLink to="/pricing">Pricing &amp; scenarios</NavLink>}
             {c('customers.read') && <NavLink to="/customers">Customers</NavLink>}
@@ -96,7 +98,7 @@ function Shell({ user, logout }: { user: Me; logout: () => void }) {
           </nav>
           <div className="side-foot">
             <div className="who">{user.name}</div>
-            <div className="muted small" style={{ color: '#8fa59b' }}>{ROLE_LABELS[user.role]}</div>
+            <div className="muted small" style={{ color: '#9cc3df' }}>{ROLE_LABELS[user.role]}</div>
             <button onClick={logout}>Sign out</button>
           </div>
         </aside>
@@ -116,6 +118,8 @@ function Shell({ user, logout }: { user: Me; logout: () => void }) {
             <Route path="/quotations/:id" element={<QuotationEditor />} />
             <Route path="/batches" element={<Batches />} />
             <Route path="/batches/:id" element={<Batches />} />
+            <Route path="/outsourced" element={<Outsourced />} />
+            <Route path="/outsourced/:id" element={<Outsourced />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

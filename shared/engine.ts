@@ -19,6 +19,7 @@ export const COST_CATEGORIES = {
   utilities_equipment: 'Utilities and equipment',
   overhead: 'Manufacturing overhead',
   other: 'Other production charges',
+  outsourcing: 'Outsourced production (partner fee, freight)',
 } as const;
 export type CostCategory = keyof typeof COST_CATEGORIES;
 

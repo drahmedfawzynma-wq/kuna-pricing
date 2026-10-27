@@ -52,7 +52,7 @@ export function MaterialPicker({ value, options, onChange, filter, placeholder =
 
 const SECTION_LABELS: Record<string, string> = { ingredients: 'Ingredients', ...COST_CATEGORIES, packaging: 'Packaging' };
 export const SECTION_COLORS: Record<string, string> = {
-  ingredients: '#2f7a62', consumable: '#8aa79a', labour: '#4f6fa8', setup_cleaning: '#7d8fbf', testing: '#a37a3c', utilities_equipment: '#b39b6b', overhead: '#7a6a9a', other: '#9a9a9a', packaging: '#c0784f',
+  ingredients: '#0369a1', consumable: '#8fa9bb', labour: '#4fae9b', setup_cleaning: '#7d8fbf', testing: '#a37a3c', utilities_equipment: '#b39b6b', overhead: '#7a6a9a', other: '#9a9a9a', packaging: '#c0784f', outsourcing: '#38bdf8',
 };
 
 /** Full itemised breakdown with quantities, rates and formulas. */
@@ -159,7 +159,7 @@ export function ProductCostChart({ rows, unitLabel, onSelect }: { rows: { id: nu
   return (
     <ResponsiveContainer width="100%" height={Math.max(220, rows.length * 34 + 60)}>
       <BarChart data={data} layout="vertical" margin={{ left: 10, right: 20, top: 4, bottom: 4 }} onClick={(e: any) => e?.activePayload?.[0] && onSelect?.(e.activePayload[0].payload.id)}>
-        <CartesianGrid horizontal={false} stroke="#eef0ec" />
+        <CartesianGrid horizontal={false} stroke="#ebf1f6" />
         <XAxis type="number" tickFormatter={(v) => num(v, 0)} fontSize={11} label={{ value: unitLabel, position: 'insideBottomRight', offset: -2, fontSize: 11 }} />
         <YAxis type="category" dataKey="name" width={190} fontSize={12} />
         <Tooltip formatter={(v: any, n: any) => [sek(v), SECTION_LABELS[n] ?? n]} />

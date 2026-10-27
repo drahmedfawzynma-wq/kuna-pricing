@@ -22,9 +22,16 @@ export default function Overview() {
   const filtered = products.filter((p) => (!search || p.name.toLowerCase().includes(search.toLowerCase()))
     && (filter === 'all' || (filter === 'incomplete' && p.estimate && !p.estimate.complete) || (filter === 'below' && below.includes(p)) || (filter === 'review' && p.version?.reviewStatus === 'needs_review')));
 
+  const belowNow = products.filter((p) => p.prices?.some((r: any) => r.status === 'approved' && (r.actualMarginPct != null ? r.belowTargetActual : r.belowTarget)));
+  const locked: any[] = data.lockedBatches ?? [];
+  const lockedUp = locked.filter((b) => b.est_cpu && b.act_cpu && dec(b.act_cpu)!.gt(b.est_cpu));
+  const partnerOpen: any[] = data.partnerBatches ?? [];
+  const changes90: any[] = data.priceChanges90 ?? [];
+  const toProducts = () => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
+
   return (
     <div>
-      <PageHeader title="Overview" subtitle={`Signed in as ${user.name}. Figures are calculated live from current material prices and recipes; nothing here is invented sales or revenue data.`}
+      <PageHeader title="Dashboard" subtitle={`Signed in as ${user.name}. Estimates are calculated live from current prices and approved recipes; actual figures come from cost-locked batches. Nothing here is invented sales data.`}
         actions={<>
           {can('materials.write') && <Button onClick={() => nav('/materials?new=1')}>Add material</Button>}
           {can('recipes.write') && <Button onClick={() => nav('/recipes?new=1')}>Create recipe</Button>}
@@ -32,17 +39,28 @@ export default function Overview() {
         </>} />
 
       <div className="kpis">
-        {data.counts && <button className="kpi" onClick={() => nav('/recipes')}><div className="kpi-label">Active products</div><div className="kpi-value">{data.counts.products}</div><div className="kpi-note">{data.counts.recipeVersions} recipe versions · {data.counts.approvedRecipes} approved</div></button>}
-        {data.counts && can('materials.read') && <button className="kpi" onClick={() => nav('/materials')}><div className="kpi-label">Materials &amp; packaging</div><div className="kpi-value">{data.counts.materials}</div><div className="kpi-note">active items</div></button>}
+        {can('pricing.read') && data.products && <button className={`kpi ${belowNow.length ? 'kpi-err' : ''}`} onClick={() => { setFilter('below'); toProducts(); }}><div className="kpi-label">Below target margin</div><div className="kpi-value">{belowNow.length}{products.length ? <span className="muted small"> of {products.length}</span> : null}</div><div className="kpi-note">approved prices at latest actual cost (estimate if no batch yet)</div></button>}
+        {data.products && <button className={`kpi ${incomplete.length ? 'kpi-warn' : ''}`} onClick={() => { setFilter('incomplete'); toProducts(); }}><div className="kpi-label">Incomplete costings</div><div className="kpi-value">{incomplete.length}</div><div className="kpi-note">{incomplete.length ? incomplete.slice(0, 2).map((p) => p.name).join(', ') : 'all products fully costed'}</div></button>}
+        {data.lockedBatches && <button className={`kpi ${lockedUp.length ? 'kpi-warn' : ''}`} onClick={() => document.getElementById('recent-batches')?.scrollIntoView({ behavior: 'smooth' })}><div className="kpi-label">Actual cost above estimate</div><div className="kpi-value">{lockedUp.length}{locked.length ? <span className="muted small"> of {locked.length}</span> : null}</div><div className="kpi-note">{locked.length ? `last ${locked.length} cost-locked batches` : 'no cost-locked batches yet'}</div></button>}
+        {data.priceChanges90 && <button className="kpi" onClick={() => document.getElementById('price-changes')?.scrollIntoView({ behavior: 'smooth' })}><div className="kpi-label">Material prices changed, 90 days</div><div className="kpi-value">{changes90.length}</div><div className="kpi-note">{changes90.length ? changes90.slice(0, 2).map((m) => m.name).join(', ') : 'no dated price changes'}</div></button>}
+        {data.partnerBatches && <button className={`kpi ${partnerOpen.length ? 'kpi-info' : ''}`} onClick={() => nav('/outsourced')}><div className="kpi-label">Batches at partners</div><div className="kpi-value">{partnerOpen.length}</div><div className="kpi-note">{partnerOpen.length ? partnerOpen.slice(0, 2).map((b) => `${b.batch_number} ${b.partner_name}`).join(', ') : 'none open'}</div></button>}
         {data.missingPrices && <button className={`kpi ${data.missingPrices.length ? 'kpi-err' : ''}`} onClick={() => nav('/materials?filter=missing')}><div className="kpi-label">Materials in use without price</div><div className="kpi-value">{data.missingPrices.length}</div><div className="kpi-note">never costed as zero</div></button>}
-        {data.products && <button className={`kpi ${incomplete.length ? 'kpi-warn' : ''}`} onClick={() => setFilter('incomplete')}><div className="kpi-label">Incomplete costings</div><div className="kpi-value">{incomplete.length}</div><div className="kpi-note">products with missing values</div></button>}
         {data.review && <button className={`kpi ${reviewCount ? 'kpi-warn' : ''}`} onClick={() => document.getElementById('review')?.scrollIntoView({ behavior: 'smooth' })}><div className="kpi-label">Records needing review</div><div className="kpi-value">{reviewCount}</div><div className="kpi-note">imports and flagged items</div></button>}
-        {can('pricing.read') && <button className={`kpi ${below.length ? 'kpi-err' : ''}`} onClick={() => setFilter('below')}><div className="kpi-label">Below target margin</div><div className="kpi-value">{below.length}</div><div className="kpi-note">at current costs vs. set prices</div></button>}
-        {data.recentQuotations && <button className="kpi" onClick={() => nav('/quotations')}><div className="kpi-label">Quotations</div><div className="kpi-value">{data.recentQuotations.length}</div><div className="kpi-note">most recent shown below</div></button>}
+        {!data.products && data.counts && <button className="kpi" onClick={() => nav('/recipes')}><div className="kpi-label">Active products</div><div className="kpi-value">{data.counts.products}</div><div className="kpi-note">{data.counts.approvedRecipes} approved recipe versions</div></button>}
+        {!data.products && data.recentQuotations && <button className="kpi" onClick={() => nav('/quotations')}><div className="kpi-label">Quotations</div><div className="kpi-value">{data.recentQuotations.length}</div><div className="kpi-note">most recent shown below</div></button>}
       </div>
 
+      {data.products && products.some((p) => p.estimate?.costPerOutputUnit) && <StandardVsActual products={products} pricing={can('pricing.read')} />}
+
+      {(data.products || data.batches) && (
+        <div className="grid-main-side" style={{ marginBottom: 16 }}>
+          {data.batches && <div id="recent-batches"><RecentBatches batches={data.batches} costs={can('costs.read')} /></div>}
+          <Attention data={data} below={belowNow} incomplete={incomplete} reviewCount={reviewCount} pricing={can('pricing.read')} />
+        </div>
+      )}
+
       {data.products && (
-        <div className="stack">
+        <div className="stack" id="products">
           <Card title="Products" actions={<>
             <SearchInput value={search} onChange={setSearch} placeholder="Search products…" />
             <select className="input" style={{ width: 'auto' }} value={filter} onChange={(e) => setFilter(e.target.value as any)}>
@@ -99,7 +117,7 @@ export default function Overview() {
 
       <div className="grid-2" style={{ marginTop: 16 }}>
         {data.recentPriceChanges && (
-          <Card title="Recent material price changes" pad={false} actions={<Link to="/materials">All materials</Link>}>
+          <div id="price-changes"><Card title="Recent material price changes" pad={false} actions={<Link to="/materials">All materials</Link>}>
             {data.recentPriceChanges.length === 0 ? <Empty title="No prices recorded yet" /> : (
               <table className="table compact"><thead><tr><th>Material</th><th>Effective</th><th className="num">Previous</th><th className="num">New</th><th className="num">Change</th></tr></thead>
                 <tbody>{data.recentPriceChanges.map((r: any) => {
@@ -110,7 +128,7 @@ export default function Overview() {
                     <td className="num">{ch ? <span className={ch.gt(0) ? 'w-error' : 'tag-act'}>{ch.gt(0) ? '+' : ''}{ch.toFixed(1)} %</span> : '—'}</td></tr>);
                 })}</tbody></table>
             )}
-          </Card>
+          </Card></div>
         )}
         {data.missingPrices && (
           <Card title="Missing prices (materials used in active products)" pad={false}>
@@ -152,13 +170,6 @@ export default function Overview() {
             {data.approvedPrices.length === 0 ? <Empty title="No approved prices yet" /> : (
               <table className="table compact"><thead><tr><th>Product</th><th>Customer</th><th className="num">Price excl. VAT</th></tr></thead>
                 <tbody>{data.approvedPrices.map((p: any) => <tr key={p.id}><td>{p.product_name}<div className="muted small">{p.packaging_name ?? 'bulk'}{p.min_qty !== '1' ? ` · from ${p.min_qty}` : ''}</div></td><td>{p.customer_name ?? 'All customers'}</td><td className="num">{sek(p.price)}</td></tr>)}</tbody></table>
-            )}
-          </Card>
-        )}
-        {data.batches && (
-          <Card title="Recent production batches" pad={false} actions={<Link to="/batches">All batches</Link>}>
-            {data.batches.length === 0 ? <Empty title="No production batches recorded" /> : (
-              <table className="table compact"><tbody>{data.batches.map((b: any) => <tr key={b.id} className="clickable" onClick={() => nav(`/batches/${b.id}`)}><td>{b.batch_number}</td><td>{b.product_name}</td><td className="num">{num(b.actual_output_qty ?? b.planned_qty)} {b.output_unit}</td><td><StatusBadge status={b.status} /></td></tr>)}</tbody></table>
             )}
           </Card>
         )}
@@ -212,6 +223,105 @@ function ScenarioPanel({ products }: { products: any[] }) {
           )}
           <span className="muted small">Bulk (unpackaged) estimate. Experimental only: nothing is saved or applied.</span>
         </div>
+      )}
+    </Card>
+  );
+}
+
+/** Standard estimate vs latest actual batch, per product, with a detail panel for the selected product. */
+function StandardVsActual({ products, pricing }: { products: any[]; pricing: boolean }) {
+  const nav = useNavigate();
+  const rows = products.filter((p) => p.estimate?.costPerOutputUnit);
+  const [sel, setSel] = useState<number | null>(() => (rows.find((p) => p.latestActual) ?? rows[0])?.id ?? null);
+  const max = rows.reduce((m, p) => Decimal.max(m, dec(p.estimate.costPerOutputUnit) ?? 0, dec(p.latestActual?.costPerOutputUnit) ?? 0), new Decimal(0));
+  const w = (v: unknown) => (dec(v as any) && max.gt(0) ? dec(v as any)!.div(max).times(100).toFixed(1) : '0');
+  const p = rows.find((x) => x.id === sel) ?? rows[0];
+  const bulk = p?.prices?.find((r: any) => r.status === 'approved' && r.priceUnit !== 'package');
+  return (
+    <div className="dash-grid" style={{ marginBottom: 16 }}>
+      <Card title={<span>Cost per L/kg: standard estimate vs latest actual batch</span>} actions={<span className="legend"><span><i className="bar-est" />Standard estimate</span><span><i className="bar-act" />Latest actual</span></span>}>
+        <div className="muted small" style={{ marginBottom: 6 }}>Click a product to see its margin and what each figure is based on. * incomplete costing</div>
+        <div className="dual">
+          {rows.map((r) => {
+            const est = dec(r.estimate.costPerOutputUnit)!;
+            const act = dec(r.latestActual?.costPerOutputUnit);
+            const d = act ? act.minus(est).div(est).times(100) : null;
+            return (
+              <button key={r.id} className={`dual-row ${r.id === p?.id ? 'on' : ''}`} onClick={() => setSel(r.id)}>
+                <span className="dual-name" title={r.name}>{r.name.replace(/ Concentrate$/, '')}{r.estimate.complete ? '' : ' *'}</span>
+                <span className="dual-bars"><span className="bar-est" style={{ width: `${w(est)}%` }} />{act ? <span className="bar-act" style={{ width: `${w(act)}%` }} /> : <span style={{ height: 8 }} />}</span>
+                <span className="dual-val">{num(est, 2)} → {act ? <strong>{num(act, 2)}</strong> : <span className="muted">no batch</span>}{d && <span className={d.gt(0) ? 'up' : 'down'}> {d.gt(0) ? '+' : ''}{d.toFixed(1)}%</span>}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+      {p && (
+        <Card title={p.name}>
+          <div className="bigs">
+            <div><div className="muted small">Standard / {p.outputUnit}</div><div className="level-value tag-est">{sek(p.estimate.costPerOutputUnit)}</div><Badge tone="accent">Estimate{p.estimate.complete ? '' : ', incomplete'}</Badge></div>
+            <div><div className="muted small">Latest actual / {p.outputUnit}</div><div className="level-value tag-act">{p.latestActual ? sek(p.latestActual.costPerOutputUnit) : '—'}</div>{p.latestActual ? <Badge tone="info">{p.latestActual.batchNumber}</Badge> : <Badge>No locked batch</Badge>}</div>
+          </div>
+          <table className="table compact"><tbody>
+            {p.latestActual && <tr><td>Made at</td><td className="num">{p.latestActual.partnerName ?? 'Kuna factory'}{p.latestActual.madeOn ? `, ${date(p.latestActual.madeOn)}` : ''}</td></tr>}
+            {p.latestActual?.estimateAtBatch && <tr><td>Estimate stored with that batch</td><td className="num">{sek(p.latestActual.estimateAtBatch)}</td></tr>}
+            {bulk ? <>
+              <tr><td>Approved price (bulk / {p.outputUnit})</td><td className="num">{sek(bulk.price)}</td></tr>
+              {pricing && <tr><td>Margin at standard cost</td><td className="num">{pct(bulk.currentMarginPct)}</td></tr>}
+              {pricing && <tr><td>Margin at latest actual cost</td><td className={`num ${bulk.belowTargetActual ? 'w-error' : ''}`}><strong>{bulk.actualMarginPct != null ? pct(bulk.actualMarginPct) : '—'}</strong></td></tr>}
+              {pricing && <tr><td>Target margin</td><td className="num">{p.targetMarginPct ? pct(p.targetMarginPct) : 'not set'}</td></tr>}
+            </> : <tr><td colSpan={2} className="muted">No approved bulk price.</td></tr>}
+          </tbody></table>
+          <div className="row" style={{ marginTop: 10 }}>
+            <Button size="sm" onClick={() => nav(`/recipes/${p.id}`)}>Open recipe</Button>
+            {p.version && <Button size="sm" onClick={() => nav(`/calculator?versionId=${p.version.id}`)}>Cost breakdown</Button>}
+            {p.latestActual && <Button size="sm" onClick={() => nav(p.latestActual.partnerName ? `/outsourced/${p.latestActual.batchId}` : `/batches/${p.latestActual.batchId}`)}>Open batch</Button>}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function RecentBatches({ batches, costs }: { batches: any[]; costs: boolean }) {
+  const nav = useNavigate();
+  return (
+    <Card title="Recent batches" pad={false} actions={<Link to="/batches">All batches</Link>}>
+      {batches.length === 0 ? <Empty title="No production batches recorded" /> : (
+        <div className="table-wrap"><table className="table compact">
+          <thead><tr><th>Batch</th><th>Product</th><th>Made at</th><th>Date</th>{costs && <><th className="num"><span className="tag-est">Est.</span> / unit</th><th className="num"><span className="tag-act">Actual</span> / unit</th><th className="num">Diff.</th></>}<th>Status</th></tr></thead>
+          <tbody>{batches.map((b) => {
+            const d = b.est_cpu && b.act_cpu ? dec(b.act_cpu)!.minus(b.est_cpu).div(b.est_cpu).times(100) : null;
+            return (
+              <tr key={b.id} className="clickable" onClick={() => nav(b.partner_name ? `/outsourced/${b.id}` : `/batches/${b.id}`)}>
+                <td className="nowrap">{b.batch_number}</td><td>{b.product_name}</td><td className="small">{b.partner_name ?? 'Kuna factory'}</td>
+                <td className="nowrap small">{date(b.received_date ?? b.production_date ?? b.sent_date)}</td>
+                {costs && <><td className="num">{num(b.est_cpu, 2)}</td><td className="num">{num(b.act_cpu, 2)}</td><td className={`num ${d ? (d.gt(0) ? 'up' : 'down') : ''}`}>{d ? `${d.gt(0) ? '+' : ''}${d.toFixed(1)} %` : '—'}</td></>}
+                <td><StatusBadge status={b.status} /></td>
+              </tr>
+            );
+          })}</tbody>
+        </table></div>
+      )}
+    </Card>
+  );
+}
+
+function Attention({ data, below, incomplete, reviewCount, pricing }: { data: any; below: any[]; incomplete: any[]; reviewCount: number; pricing: boolean }) {
+  const items: { tone: 'error' | 'warning' | 'info'; node: React.ReactNode }[] = [];
+  for (const m of (data.missingPrices ?? []).slice(0, 4)) items.push({ tone: 'error', node: <><Link to={`/materials/${m.id}`}><strong>{m.name}</strong></Link> has no price, so the costing of {m.products.join(', ')} is incomplete.</> });
+  if (pricing && below.length) items.push({ tone: 'warning', node: <><strong>{below.length} product{below.length > 1 ? 's' : ''}</strong> below target margin: {below.map((p) => p.name.replace(/ Concentrate$/, '')).join(', ')}.</> });
+  const otherIncomplete = incomplete.filter((p) => !(data.missingPrices ?? []).some((m: any) => m.products.includes(p.name)));
+  if (otherIncomplete.length) items.push({ tone: 'warning', node: <>Incomplete costing (missing rate or value): {otherIncomplete.map((p) => p.name).join(', ')}.</> });
+  for (const b of data.partnerBatches ?? []) {
+    const label = !b.sent_date ? 'ingredients not sent yet' : !b.received_date ? `at ${b.partner_name}, waiting for finished goods` : !b.costs_locked ? 'received, actual cost not locked' : 'waiting for quality release';
+    items.push({ tone: 'info', node: <><Link to={`/outsourced/${b.id}`}><strong>{b.batch_number}</strong></Link> {b.product_name}: {label}.</> });
+  }
+  if (reviewCount) items.push({ tone: 'warning', node: <><a href="#review"><strong>{reviewCount} record{reviewCount > 1 ? 's' : ''}</strong></a> waiting for review.</> });
+  return (
+    <Card title="Needs attention">
+      {items.length === 0 ? <span className="muted">Nothing needs attention.</span> : (
+        <ul className="attention">{items.map((it, i) => <li key={i} className={`w-${it.tone}`} style={{ color: 'inherit' }}><span className="w-dot" /><span>{it.node}</span></li>)}</ul>
       )}
     </Card>
   );
