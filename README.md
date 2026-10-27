@@ -8,10 +8,10 @@ Workflow: **materials and prices → recipes (versioned) → batch calculator �
 
 Requirements: Node.js **22.13 or newer** (`node -v`) from nodejs.org.
 
-1. Clone this repository to `~/Projects/kuna-pricing` (GitHub Desktop: *Clone a Repository from the Internet*).
+1. Clone this repository to `~/Documents/Projects/kuna-pricing` (GitHub Desktop: *Clone a Repository from the Internet*).
 2. In Terminal:
    ```bash
-   cd ~/Projects/kuna-pricing
+   cd ~/Documents/Projects/kuna-pricing
    ./scripts/install-mac.sh
    ```
    This installs packages, builds the interface, starts the app as a background service (starts at login, restarts if it stops) and schedules a daily backup. It opens http://127.0.0.1:4310; the first visit asks you to create the administrator account.
@@ -20,7 +20,7 @@ Where things live:
 
 | What | Location |
 |---|---|
-| Code (Git) | `~/Projects/kuna-pricing` |
+| Code (Git) | `~/Documents/Projects/kuna-pricing` |
 | Live database | `~/KunaData/kuna.db` (outside the code folder and outside iCloud) |
 | Log files | `~/KunaData/server.log`, `~/KunaData/backup.log` |
 | Backups | `iCloud Drive/Kuna Backups` (or `~/KunaData/backups` without iCloud), daily at 12:30 and before every update, newest 90 kept |
@@ -29,7 +29,7 @@ Where things live:
 
 In GitHub Desktop click **Fetch origin**, then **Pull origin**. Then:
 ```bash
-cd ~/Projects/kuna-pricing
+cd ~/Documents/Projects/kuna-pricing
 ./scripts/install-mac.sh
 ```
 The installer backs up your data, rebuilds and restarts. Database changes are applied automatically at startup; your data is never replaced.
@@ -106,7 +106,7 @@ Original values are stored unchanged on every imported record (visible under "Im
 Backups run automatically (see above). For an extra one at any time:
 
 ```bash
-cd ~/Projects/kuna-pricing && npm run backup
+cd ~/Documents/Projects/kuna-pricing && npm run backup
 ```
 
 To restore: run `./scripts/uninstall-mac.sh`, copy the chosen backup to `~/KunaData/kuna.db` (delete any `kuna.db-wal` and `kuna.db-shm` beside it), then run `./scripts/install-mac.sh`.
