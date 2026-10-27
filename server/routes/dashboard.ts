@@ -37,7 +37,7 @@ export function registerDashboardRoutes(app: FastifyInstance) {
           return {
             id: sp.id, status: sp.status, customerId: sp.customer_id, price: sp.price, priceUnit: sp.price_unit, minQty: sp.min_qty,
             packagingName: sp.packaging_name, currentUnitCost: unitCost, currentMarginPct: pricing && m?.ok ? m.value : null, complete: c.complete,
-            belowTarget: pricing && m?.ok && p.target_margin_pct ? dec(m.value)!.lt(p.target_margin_pct) : false,
+            belowTarget: pricing && m?.ok && p.target_margin_pct ? dec(m.value)!.toDecimalPlaces(2).lt(p.target_margin_pct) : false,
           };
         });
         return {

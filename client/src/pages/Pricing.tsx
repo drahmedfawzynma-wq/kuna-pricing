@@ -107,6 +107,9 @@ function PriceCalculator() {
           </div>}
         </Card>
 
+        {p && sel.versionId && <VolumePricing product={p} versionId={sel.versionId} batchQty={batchQty} method={method} methodValue={methodValue} customerId={customerId || null}
+          minQty={minQty} effectiveFrom={effectiveFrom} volumesSetting={settings.data?.settings.sell_volumes ?? '500 mL, 1 L, 1.5 L'} targetMargin={p.targetMarginPct} onProductChanged={sel.product.reload} onPick={(fid) => setFormatId(fid)} />}
+
         <Card title="2 · Kuna selling price to the customer">
           <div className="row" style={{ marginBottom: 10 }}>
             {(['margin', 'markup', 'manual'] as const).map((k) => <label key={k} className="check"><input type="radio" checked={method === k} onChange={() => setMethod(k)} /> {k === 'margin' ? 'Target gross margin' : k === 'markup' ? 'Markup on cost' : 'Enter price manually'}</label>)}
@@ -147,14 +150,14 @@ function PriceCalculator() {
                 <div className="level"><div className="level-title">Selling price / {per} <Badge tone="info">proposal</Badge></div><div className="level-value">{sek(price)}</div>{showVat && price && <div className="small muted">{sek(withVat(price, vatPct))} incl. {vatPct} % VAT</div>}</div>
               </div>
               <div className="summary-list">
-                <span className="lbl">Gross margin</span><span className="val"><strong className={target && m?.ok && dec(m.value)!.lt(target) ? 'w-error' : ''}>{m?.ok ? pct(m.value, 2) : '—'}</strong></span>
+                <span className="lbl">Gross margin</span><span className="val"><strong className={target && m?.ok && dec(m.value)!.toDecimalPlaces(2).lt(target) ? 'w-error' : ''}>{m?.ok ? pct(m.value, 2) : '—'}</strong></span>
                 <span className="lbl">Markup</span><span className="val">{mk?.ok ? pct(mk.value, 2) : '—'}</span>
                 <span className="lbl">Estimated gross profit / {per}</span><span className="val">{sek(gp)}</span>
                 <span className="lbl">Estimated gross profit / batch ({num(units, 2)} {formatId ? 'pkg' : p?.outputUnit})</span><span className="val">{gp && units ? sek(dec(gp)!.times(units)) : '—'}</span>
                 {contribution && <><span className="lbl">Contribution after selling charges / {per}</span><span className="val">{sek(contribution)}</span></>}
                 {target && <><span className="lbl">Target margin</span><span className="val">{pct(target)}</span></>}
               </div>
-              {target && m?.ok && dec(m.value)!.lt(target) && <Alert tone="warn">Below the {pct(target)} target margin.</Alert>}
+              {target && m?.ok && dec(m.value)!.toDecimalPlaces(2).lt(target) && <Alert tone="warn">Below the {pct(target)} target margin.</Alert>}
               {can('pricing.write') && (
                 <Button kind="primary" disabled={busy || !price || !sel.versionId} onClick={() => run(() => api.post('/api/prices', {
                   recipeVersionId: sel.versionId, batchQty, packagingFormatId: formatId || null, priceUnit: formatId ? 'package' : 'output_unit',
@@ -311,5 +314,101 @@ function Scenarios() {
         </Card>
       )}
     </div>
+  );
+}
+
+/** Parse "500 mL, 1 L, 1.5 L" into amounts in mL (or g for products sold per kg). */
+function parseVolumes(text: string, outputUnit: string): number[] {
+  const out: number[] = [];
+  for (const part of text.split(/[;|]|,\s+/)) {
+    const m = /^\s*([\d.,]+)\s*(ml|l|g|kg)?\s*$/i.exec(part);
+    if (!m) continue;
+    const n = Number(m[1].replace(',', '.'));
+    if (!(n > 0)) continue;
+    const u = (m[2] ?? (outputUnit === 'kg' ? 'g' : 'mL')).toLowerCase();
+    out.push(u === 'l' || u === 'kg' ? n * 1000 : n);
+  }
+  return [...new Set(out)].sort((a, b) => a - b);
+}
+
+function VolumePricing({ product, versionId, batchQty, method, methodValue, customerId, minQty, effectiveFrom, volumesSetting, targetMargin, onProductChanged, onPick }: {
+  product: any; versionId: number; batchQty: string; method: 'margin' | 'markup' | 'manual'; methodValue: string; customerId: number | null; minQty: string; effectiveFrom: string;
+  volumesSetting: string; targetMargin: string | null; onProductChanged: () => void; onPick: (formatId: number) => void;
+}) {
+  const { can } = useAuth();
+  const small = product.outputUnit === 'kg' ? 'g' : 'mL';
+  const big = product.outputUnit;
+  const [extra, setExtra] = useState<number[]>([]);
+  const [custom, setCustom] = useState('');
+  const [results, setResults] = useState<Record<string, any>>({});
+  const prices = useLoad<any[]>(`/api/prices?productId=${product.id}`);
+  const { run, busy } = useAction();
+  const formats = product.packagingFormats.filter((f: any) => !f.archived && f.fillQty);
+  const fillSmall = (f: any) => { const q = Number(f.fillQty); return f.fillUnit === 'L' || f.fillUnit === 'kg' ? q * 1000 : q; };
+  const volumes = [...new Set([...parseVolumes(volumesSetting, product.outputUnit), ...extra, ...formats.map(fillSmall)])].sort((a, b) => a - b);
+  const label = (v: number) => (v >= 1000 ? `${String(v / 1000).replace('.', ',')} ${big}` : `${v} ${small}`);
+  const rows = volumes.flatMap((v) => {
+    const fs = formats.filter((f: any) => Math.abs(fillSmall(f) - v) < 1e-9);
+    return fs.length ? fs.map((f: any) => ({ v, f })) : [{ v, f: null as any }];
+  });
+
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      const out: Record<string, any> = {};
+      const bulk = await api.post('/api/costings/calculate', { recipeVersionId: versionId, batchQty: batchQty || null }).catch((e) => ({ error: e.message }));
+      out.bulk = bulk;
+      await Promise.all(formats.map(async (f: any) => {
+        out[f.id] = await api.post('/api/costings/calculate', { recipeVersionId: versionId, batchQty: batchQty || null, packagingFormatId: f.id }).catch((e) => ({ error: e.message }));
+      }));
+      setResults(out);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [versionId, batchQty, JSON.stringify(formats.map((f: any) => [f.id, f.fillQty, f.components]))]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const createFormat = async (v: number) => {
+    const r = await run(() => api.post(`/api/products/${product.id}/packaging`, { name: label(v), fillQty: v >= 1000 ? String(v / 1000) : String(v), fillUnit: v >= 1000 ? big : small, components: [], notes: 'Created from the price calculator. Add bottle, cap, label and carton under Recipes → Packaging.' }), `${label(v)} format created`);
+    if (r) onProductChanged();
+    return r?.id as number | undefined;
+  };
+  const propose = async (fid: number) => {
+    const r = await run(() => api.post('/api/prices', { recipeVersionId: versionId, batchQty: batchQty || null, packagingFormatId: fid, priceUnit: 'package', method, methodValue: method === 'manual' ? null : methodValue, price: null, customerId, minQty, effectiveFrom }), 'Price proposed. Approve it in the price list.');
+    if (r) prices.reload();
+  };
+
+  return (
+    <Card title="Price by sales volume" actions={<div className="row" style={{ gap: 6 }}>
+      <NumInput className="input-sm" style={{ width: 90 }} value={custom} onChange={setCustom} placeholder={small} />
+      <Button size="sm" disabled={!dec(custom)} onClick={() => { setExtra([...extra, Number(custom.replace(',', '.'))]); setCustom(''); }}>Add volume</Button>
+    </div>}>
+      {method === 'manual' && <Alert tone="info">Choose a target margin or markup in section 2 to see suggested prices for every volume.</Alert>}
+      <div className="table-wrap"><table className="table compact">
+        <thead><tr><th>Volume</th><th className="num">Unit cost</th><th className="num">Suggested</th><th className="num">Approved</th><th className="num">Margin now</th><th></th></tr></thead>
+        <tbody>{rows.map(({ v, f }) => {
+          const r = f ? results[f.id] : null;
+          const bulk = results.bulk;
+          const liquid = bulk?.costPerOutputUnit ? dec(bulk.costPerOutputUnit)!.times(v).div(1000) : null;
+          const unitCost = f ? r?.costPerPackage ?? null : null;
+          const pkgCost = f ? r?.packagingPerPackage ?? null : null;
+          const pr = unitCost && method !== 'manual' ? (method === 'margin' ? priceForMargin(unitCost, methodValue) : priceForMarkup(unitCost, methodValue)) : null;
+          const approved = f ? (prices.data ?? []).find((x) => x.status === 'approved' && x.packagingFormatId === f.id && (x.customerId ?? null) === customerId && x.priceUnit === 'package') : null;
+          const mNow = approved && unitCost ? marginPct(approved.price, unitCost) : null;
+          const below = mNow?.ok && targetMargin ? dec(mNow.value)!.toDecimalPlaces(2).lt(targetMargin) : false;
+          const err = f && r && (r.error || (!r.costPerPackage && r.warnings?.find((w: any) => w.level === 'error')?.message));
+          return (
+            <tr key={`${v}-${f?.id ?? 'new'}`}>
+              <td><strong>{label(v)}</strong><div className="muted small">{f ? f.name : 'no format yet'}</div>{f && !f.components?.length && <Badge tone="warn">no packaging items</Badge>}</td>
+              <td className="num">{f ? (err ? <span className="w-error small">{err}</span> : <><strong className="tag-est">{sek(unitCost)}</strong><div className="muted small">{sek(r?.costPerPackage && r?.packagingPerPackage ? dec(r.costPerPackage)!.minus(r.packagingPerPackage) : null)} product + {sek(pkgCost)} pack</div></>)
+                : <span className="muted small" title="Product cost only, before packaging">{sek(liquid)} product only</span>}</td>
+              <td className="num">{pr?.ok ? <strong>{sek(pr.value)}</strong> : <span className="muted small">{pr && !pr.ok ? pr.error : '—'}</span>}</td>
+              <td className="num">{approved ? sek(approved.price) : <span className="muted">—</span>}</td>
+              <td className="num">{mNow?.ok ? <span className={below ? 'w-error' : ''}>{pct(mNow.value)}</span> : '—'}</td>
+              <td className="nowrap">{can('pricing.write') && (f
+                ? <><Button size="sm" kind="primary" disabled={busy || !pr?.ok || !r?.complete} title={!r?.complete ? 'Costing incomplete' : undefined} onClick={() => propose(f.id)}>Propose</Button>{' '}<Button size="sm" kind="ghost" onClick={() => onPick(f.id)}>Details</Button></>
+                : can('recipes.write') && <Button size="sm" disabled={busy} onClick={() => createFormat(v)} title={`Create a ${label(v)} format`}>Create format</Button>)}</td>
+            </tr>);
+        })}</tbody>
+      </table></div>
+      <div className="muted small" style={{ marginTop: 8 }}>Costs are recalculated from current material prices every time you open this page, so a price update shows here immediately as a new unit cost and a new margin against the approved price (red when below the target margin). Approved prices stay fixed until you propose and approve a new one. Volumes are set under Settings; a new format starts without packaging items, add them under Recipes → Packaging.</div>
+    </Card>
   );
 }

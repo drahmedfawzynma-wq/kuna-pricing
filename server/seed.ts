@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   quotation_validity_days: '30',
   company_name: 'Kuna Group Sweden AB',
   company_address: '',
+  sell_volumes: '500 mL, 1 L, 1.5 L',
   quotation_terms: 'Prices exclude VAT unless stated. Delivery charges are shown separately.',
 };
 

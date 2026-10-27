@@ -319,9 +319,8 @@ export function registerRecipeRoutes(app: FastifyInstance) {
     const b = packagingBody.parse(req.body);
     const used = db.get<any>(`SELECT (SELECT COUNT(*) FROM selling_prices WHERE packaging_format_id = ? AND status IN ('approved','proposed'))
       + (SELECT COUNT(*) FROM quotation_lines WHERE packaging_format_id = ?) + (SELECT COUNT(*) FROM production_batches WHERE packaging_format_id = ?) AS n`, id, id, id).n;
-    const contentChanged = b.fillQty !== before.fill_qty || b.fillUnit !== before.fill_unit
-      || JSON.stringify(b.components.map((c) => [c.materialId, c.qtyPerPackage])) !== JSON.stringify(db.all<any>('SELECT material_id, qty_per_package FROM packaging_components WHERE format_id = ? ORDER BY id', id).map((c) => [c.material_id, c.qty_per_package]));
-    if (used && contentChanged) throw new HttpError(409, 'This packaging format is used by selling prices, quotations or batches, so its fill and components are locked. Archive it and add a new format instead (prices are per format).');
+    const fillChanged = !(dec(b.fillQty)?.eq(dec(before.fill_qty) ?? -1)) || b.fillUnit !== before.fill_unit;
+    if (used && fillChanged) throw new HttpError(409, 'This format is used by selling prices, quotations or batches, so its fill volume is locked (prices are per volume). Add a new format for a different volume. Packaging components can still be changed; saved prices and quotations keep their own snapshot.');
     db.tx(() => {
       db.run('UPDATE packaging_formats SET name=?, fill_qty=?, fill_unit=?, notes=?, needs_review=? WHERE id=?', b.name, b.fillQty, b.fillUnit, b.notes, b.needsReview ? 1 : 0, id);
       db.run('DELETE FROM packaging_components WHERE format_id = ?', id);

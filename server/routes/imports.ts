@@ -248,10 +248,6 @@ export function applyCosting(db: DB, me: SessionUser, importId: number, a: Costi
     db.run('INSERT INTO recipe_ingredients (recipe_version_id, line_no, material_id, quantity, unit, note, needs_review) VALUES (?,?,?,?,?,?,?)',
       vid, line++, mid, unitOk ? ing.quantity : null, unitOk ? ing.unit : 'g', unitOk ? 'Imported from Batchworks' : `Batchworks: ${ing.quantity} ${ing.unit} (unit not recognised)`, unitOk ? 0 : 1);
   }
-  if (d.waterQty && dec(d.waterQty)) {
-    const waterId = ensureMaterial(db, me, importId, 'Water', 'L', 'water', 'Created during import review. Enter the water cost (SEK/L).');
-    db.run('INSERT INTO recipe_ingredients (recipe_version_id, line_no, material_id, quantity, unit, note) VALUES (?,?,?,?,?,?)', vid, line++, waterId, d.waterQty, d.waterUnit, 'Entered during import review');
-  }
 
   let cl = 1;
   for (const l of parsed.labour) {

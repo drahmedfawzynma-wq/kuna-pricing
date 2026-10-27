@@ -300,7 +300,7 @@ describe('Batchworks import', () => {
     const straw = products.body.find((p: any) => p.name === 'Strawberry Concentrate');
     expect(straw.currentVersion.reviewStatus).toBe('needs_review');
     const sv = await call('production', 'GET', `/api/recipe-versions/${straw.currentVersion.id}`);
-    expect(sv.body.ingredients.some((i: any) => /water/i.test(i.materialName ?? ''))).toBe(false); // no water line added
+    expect(sv.body.ingredients.some((i: any) => /water/i.test(i.materialName ?? ''))).toBe(false);
     expect(sv.body.costItems).toHaveLength(0); // labour not imported
     const calc = await call('production', 'POST', '/api/costings/calculate', { recipeVersionId: straw.currentVersion.id });
     expect(calc.body.batchQty).toBe('50');
@@ -311,13 +311,11 @@ describe('Batchworks import', () => {
     const pv = await call('production', 'POST', '/api/imports/preview', { files: [{ filename: 's.csv', text: fs.readFileSync(path.join(SAMPLE, 'batchworks-strawberry-concentrate-2026-10-27.csv'), 'utf8').replace('Strawberry Concentrate', 'Strawberry Concentrate Reviewed') }] });
     const ap = await call('production', 'POST', `/api/imports/${pv.body.ids[0]}/apply`, { decisions: { labourChoice: 'fixed', waterQty: '850', waterUnit: 'mL', confirmed: true } });
     expect(ap.status).toBe(200);
-    const water = (await call('production', 'GET', '/api/materials')).body.find((m: any) => m.code === 'water');
-    await call('production', 'POST', `/api/materials/${water.id}/prices`, { effectiveDate: '2026-10-01', entryMode: 'per_unit', price: '0.05', currency: 'SEK' });
     const fmt = (await call('production', 'GET', `/api/products/${ap.body.productId}`)).body.packagingFormats[0];
     const c = await call('production', 'POST', '/api/costings/calculate', { recipeVersionId: ap.body.recipeVersionId, packagingFormatId: fmt.id });
     expect(c.body.packagedUnits).toBe('50');
-    // unrounded 10037.466 (export shows 10037.47) + water 0.85 L × 50 × 0.05 = 2.125
-    expect(Number(c.body.totalBatchCost).toFixed(2)).toBe('10039.59');
+    // reproduces the export total (unrounded 10037.466); no water line is ever added
+    expect(Number(c.body.totalBatchCost).toFixed(2)).toBe('10037.47');
   });
 });
 
