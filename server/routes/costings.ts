@@ -24,6 +24,12 @@ const recipeOverride = z.object({
   })),
 });
 
+export const batchCost = z.object({
+  category: z.enum(['consumable', 'labour', 'setup_cleaning', 'testing', 'utilities_equipment', 'overhead', 'other']).default('labour'),
+  description: z.string().max(200).default(''),
+  amount: z.string().refine((v) => { const d = dec(v); return !!d && d.gte(0); }, 'batch cost amount must be a number ≥ 0'),
+});
+
 export const costingRequest = z.object({
   recipeVersionId: z.number().int(),
   batchQty: z.string().nullable().optional(),
@@ -33,6 +39,7 @@ export const costingRequest = z.object({
   recipe: recipeOverride.optional(),
   actualOutputQty: z.string().nullable().optional(),
   actualPackagedUnits: z.string().nullable().optional(),
+  extraCosts: z.array(batchCost).max(30).optional(),
 });
 
 function toReq(b: z.infer<typeof costingRequest>) {
@@ -48,6 +55,7 @@ function toReq(b: z.infer<typeof costingRequest>) {
     recipeOverride: b.recipe ? ({ ...b.recipe, outputUnit: 'L' } as any) : undefined,
     actualOutputQty: b.actualOutputQty || null,
     actualPackagedUnits: b.actualPackagedUnits || null,
+    extraCosts: b.extraCosts?.length ? b.extraCosts : undefined,
   };
 }
 

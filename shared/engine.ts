@@ -118,6 +118,14 @@ export interface CostingInput {
   actualOutputQty?: string | null;
   /** Actual packaged units (actual costing only). */
   actualPackagedUnits?: string | null;
+  /** Costs specific to this batch (e.g. labour entered per production batch). Fixed SEK amounts, not scaled. */
+  extraCosts?: BatchCost[];
+}
+
+export interface BatchCost {
+  category: CostCategory;
+  description: string;
+  amount: string | null;
 }
 
 export type LineStatus = 'ok' | 'missing' | 'error';
@@ -361,7 +369,14 @@ export function calculateCosting(input: CostingInput): CostingResult {
   const sections: Record<string, Decimal> = { ingredients };
   for (const c of Object.keys(COST_CATEGORIES)) sections[c] = new Decimal(0);
   const percentItems: { item: CostItem; idx: number }[] = [];
-  recipe.costItems.forEach((item, i) => {
+  const costItems: CostItem[] = [
+    ...recipe.costItems,
+    ...(input.extraCosts ?? []).map((e) => ({
+      category: e.category, basis: 'fixed' as const, rate: e.amount,
+      description: `This batch: ${e.description || COST_CATEGORIES[e.category] || 'cost'}`,
+    })),
+  ];
+  costItems.forEach((item, i) => {
     const r = `cost-${i}`;
     const base: CostLine = { section: item.category, ref: r, label: item.description || COST_CATEGORIES[item.category] || 'Cost line', formula: '', amount: null, status: 'error' };
     if (!(item.category in COST_CATEGORIES) || !(item.basis in COST_BASES)) {
@@ -465,8 +480,8 @@ export function calculateCosting(input: CostingInput): CostingResult {
   }
 
   // Double-counting guard: overhead declared to include utilities AND separate utility lines.
-  const overheadIncludesUtilities = recipe.costItems.some((c) => c.category === 'overhead' && c.includesUtilities);
-  const hasUtilityLines = recipe.costItems.some((c) => c.category === 'utilities_equipment');
+  const overheadIncludesUtilities = costItems.some((c) => c.category === 'overhead' && c.includesUtilities);
+  const hasUtilityLines = costItems.some((c) => c.category === 'utilities_equipment');
   if (overheadIncludesUtilities && hasUtilityLines) {
     warnings.push({ level: 'error', code: 'double_count', message: 'An overhead line is marked as already including utilities, but separate utility/equipment lines also exist. Remove one to avoid counting the same cost twice.' });
   }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { HttpError, requirePerm, userCan } from '../auth';
 import { today } from '../db';
 import { audit, currentVersion, runCosting, saveCosting } from '../services';
+import { batchCost } from './costings';
 import { calculateCosting, type CostingInput } from '../../shared/engine';
 import { Decimal, dec, str } from '../../shared/decimal';
 
@@ -59,12 +60,13 @@ export function registerBatchRoutes(app: FastifyInstance) {
       productId: z.number().int(), recipeVersionId: z.number().int().nullable().optional(), packagingFormatId: z.number().int().nullable().optional(),
       plannedQty: z.string().refine((v) => dec(v)?.gt(0), 'planned quantity must be > 0'), plannedYieldPct: z.string().nullable().optional(),
       productionDate: optDate, expiryDate: optDate, batchNumber: z.string().trim().max(60).nullable().optional(), notes: z.string().max(5000).nullable().optional(),
+      extraCosts: z.array(batchCost).max(30).optional(),
     }).parse(req.body);
     const v = b.recipeVersionId ? db.get<any>('SELECT * FROM recipe_versions WHERE id = ? AND product_id = ?', b.recipeVersionId, b.productId) : currentVersion(db, b.productId);
     if (!v) throw new HttpError(400, 'No recipe version for this product.');
     if (v.status !== 'approved') throw new HttpError(409, `Recipe v${v.version_no} is ${v.status}. Approve a recipe version before planning production, so the batch refers to a locked formulation.`);
     const product = db.get<any>('SELECT * FROM products WHERE id = ?', b.productId);
-    const c = runCosting(db, { recipeVersionId: v.id, batchQty: b.plannedQty, yieldPctOverride: b.plannedYieldPct || null, packagingFormatId: b.packagingFormatId });
+    const c = runCosting(db, { recipeVersionId: v.id, batchQty: b.plannedQty, yieldPctOverride: b.plannedYieldPct || null, packagingFormatId: b.packagingFormatId, extraCosts: b.extraCosts });
     const id = db.tx(() => {
       let num = b.batchNumber;
       if (!num) {
@@ -103,7 +105,7 @@ export function registerBatchRoutes(app: FastifyInstance) {
       status: z.enum(['planned', 'in_production', 'on_hold']).optional(),
       productionDate: optDate, expiryDate: optDate, notes: z.string().max(5000).nullable().optional(),
       actualOutputQty: z.string().nullable().optional(), actualPackagedUnits: z.string().nullable().optional(),
-      actualAdjustments: z.array(z.object({ label: z.string().min(1).max(200), amount: z.string() })).max(30).optional(),
+      actualAdjustments: z.array(z.object({ label: z.string().min(1).max(200), amount: z.string(), category: z.enum(['consumable', 'labour', 'setup_cleaning', 'testing', 'utilities_equipment', 'other']).default('labour') })).max(30).optional(),
     }).parse(req.body);
     if (['released', 'rejected'].includes(before.status)) throw new HttpError(409, `Batch is ${before.status}; its record is closed.`);
     if (b.status && b.status !== before.status && !TRANSITIONS[before.status]?.includes(b.status)) throw new HttpError(409, `Cannot move a ${before.status} batch to ${b.status}. Release and rejection are quality decisions.`);
@@ -132,8 +134,8 @@ export function registerBatchRoutes(app: FastifyInstance) {
     const input: CostingInput = JSON.parse(est.inputs_json);
     input.actualOutputQty = b.actual_output_qty;
     input.actualPackagedUnits = b.actual_packaged_units;
-    const adjustments: { label: string; amount: string }[] = b.actual_costs_json ? JSON.parse(b.actual_costs_json) : [];
-    input.recipe.costItems = [...input.recipe.costItems, ...adjustments.map((a) => ({ category: 'other' as const, description: `Actual: ${a.label}`, basis: 'fixed' as const, rate: a.amount }))];
+    const adjustments: { label: string; amount: string; category?: string }[] = b.actual_costs_json ? JSON.parse(b.actual_costs_json) : [];
+    input.recipe.costItems = [...input.recipe.costItems, ...adjustments.map((a) => ({ category: (a.category ?? 'other') as any, description: `Actual: ${a.label}`, basis: 'fixed' as const, rate: a.amount }))];
     const result = calculateCosting(input);
     const version = db.get<any>('SELECT rv.*, p.name AS product_name, p.output_unit FROM recipe_versions rv JOIN products p ON p.id = rv.product_id WHERE rv.id = ?', b.recipe_version_id);
     db.tx(() => {

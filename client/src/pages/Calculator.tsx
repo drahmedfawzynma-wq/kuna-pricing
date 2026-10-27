@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { Alert, Badge, Button, Card, Empty, Field, Loading, Modal, NumInput, PageHeader, useAction, useLoad } from '../ui';
-import { CostBreakdown, CostSummary, SectionChart } from '../components';
+import { BatchCostsEditor, CostBreakdown, CostSummary, SectionChart, validBatchCosts, type BatchCostRow } from '../components';
 import { dateTime, num, sek } from '../format';
 import type { CostingResult } from '../../../shared/engine';
 
@@ -26,6 +26,7 @@ function LiveCalculator() {
   const [yieldOverride, setYieldOverride] = useState('');
   const [formatId, setFormatId] = useState<number | ''>('');
   const [actualOutput, setActualOutput] = useState('');
+  const [batchCosts, setBatchCosts] = useState<BatchCostRow[]>([]);
   const [result, setResult] = useState<CostingResult | null>(null);
   const [actual, setActual] = useState<CostingResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -44,7 +45,7 @@ function LiveCalculator() {
   const versionDetail = useLoad<any>(versionId ? `/api/recipe-versions/${versionId}` : null);
   useEffect(() => { if (versionDetail.data) { setBatchQty(versionDetail.data.defaultBatchQty ?? versionDetail.data.referenceBatchQty ?? ''); setYieldOverride(''); } }, [versionDetail.data]);
 
-  const req = useMemo(() => versionId ? { recipeVersionId: versionId, batchQty: batchQty || null, yieldPctOverride: yieldOverride || null, packagingFormatId: formatId || null } : null, [versionId, batchQty, yieldOverride, formatId]);
+  const req = useMemo(() => versionId ? { recipeVersionId: versionId, batchQty: batchQty || null, yieldPctOverride: yieldOverride || null, packagingFormatId: formatId || null, extraCosts: validBatchCosts(batchCosts) } : null, [versionId, batchQty, yieldOverride, formatId, batchCosts]);
   useEffect(() => {
     if (!req) return;
     const t = setTimeout(async () => {
@@ -66,7 +67,7 @@ function LiveCalculator() {
       <PageHeader title="Batch calculator" subtitle="Select a recipe, production scale, yield and packaging. Figures recalculate as you type and are estimates from current material prices until saved as a snapshot."
         actions={result && <>
           <Button onClick={() => setSaving(true)} disabled={!result}>Save costing</Button>
-          {can('batches.write') && <Button onClick={async () => { const r = await run(() => api.post('/api/batches', { productId, recipeVersionId: versionId, packagingFormatId: formatId || null, plannedQty: batchQty, plannedYieldPct: yieldOverride || null }), 'Production batch planned'); if (r) nav(`/batches/${r.id}`); }} disabled={busy}>Plan production batch</Button>}
+          {can('batches.write') && <Button onClick={async () => { const r = await run(() => api.post('/api/batches', { productId, recipeVersionId: versionId, packagingFormatId: formatId || null, plannedQty: batchQty, plannedYieldPct: yieldOverride || null, extraCosts: validBatchCosts(batchCosts) }), 'Production batch planned'); if (r) nav(`/batches/${r.id}`); }} disabled={busy}>Plan production batch</Button>}
           {can('pricing.write') && <Button kind="primary" onClick={() => nav(`/pricing?versionId=${versionId}&batchQty=${batchQty}${formatId ? `&formatId=${formatId}` : ''}`)}>Price this</Button>}
         </>} />
       <Card>
@@ -80,6 +81,10 @@ function LiveCalculator() {
           <Field label="Packaging format"><select className="input" value={formatId} disabled={!p} onChange={(e) => setFormatId(e.target.value ? Number(e.target.value) : '')}>
             <option value="">Bulk (per {u}, no packaging)</option>{p?.packagingFormats.filter((f: any) => !f.archived).map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></Field>
           <Field label={`Actual accepted output (${u})`} hint="Optional: compare with the estimate."><NumInput value={actualOutput} onChange={setActualOutput} placeholder="—" disabled={!versionId} /></Field>
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <div className="field-label" style={{ marginBottom: 6 }}>Costs for this batch <span className="muted small">(labour and other costs that vary per production run; fixed SEK amounts added to the recipe costs)</span></div>
+          <BatchCostsEditor rows={batchCosts} onChange={setBatchCosts} disabled={!versionId} />
         </div>
       </Card>
       {err && <Alert tone="error">{err}</Alert>}

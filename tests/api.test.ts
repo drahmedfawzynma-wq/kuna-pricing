@@ -288,29 +288,31 @@ describe('Batchworks import', () => {
         expect(a.multiplier).toBe('50');
         expect(a.proposed.defaultBatchQty).toBe('50');
         expect(a.proposed.referenceBatchQty).toBe('1');
-        expect(a.proposed.labourChoice).toBe('unresolved');
+        expect(a.proposed.labourChoice).toBe('exclude');
         expect(a.lineChecks.every((l: any) => l.materialId)).toBe(true);
       }
       if (a.parsed.productName === 'Focus Concentrate') expect(a.multiplier).toBe('1.5');
       const ap = await call('production', 'POST', `/api/imports/${id}/apply`, {});
       expect(ap.status).toBe(200);
-      expect(ap.body.summary.needsReview).toBe(true); // water + confirmation pending
+      expect(ap.body.summary.needsReview).toBe(true); // interpretation not yet confirmed
     }
     const products = await call('production', 'GET', '/api/products');
     const straw = products.body.find((p: any) => p.name === 'Strawberry Concentrate');
-    expect(straw.estimate.complete).toBe(false); // water qty/price + labour unresolved => never silently complete
+    expect(straw.currentVersion.reviewStatus).toBe('needs_review');
+    const sv = await call('production', 'GET', `/api/recipe-versions/${straw.currentVersion.id}`);
+    expect(sv.body.ingredients.some((i: any) => /water/i.test(i.materialName ?? ''))).toBe(false); // no water line added
+    expect(sv.body.costItems).toHaveLength(0); // labour not imported
     const calc = await call('production', 'POST', '/api/costings/calculate', { recipeVersionId: straw.currentVersion.id });
     expect(calc.body.batchQty).toBe('50');
     expect(Number(calc.body.sections.ingredients).toFixed(2)).toBe('2059.57'); // scaled once from 1 L
-    expect(calc.body.warnings.some((w: any) => w.code === 'missing_price' && /Water/.test(w.message))).toBe(false); // water qty missing first
   });
 
   it('a confirmed import with labour as fixed and water entered reproduces the export total plus water', async () => {
     const pv = await call('production', 'POST', '/api/imports/preview', { files: [{ filename: 's.csv', text: fs.readFileSync(path.join(SAMPLE, 'batchworks-strawberry-concentrate-2026-10-27.csv'), 'utf8').replace('Strawberry Concentrate', 'Strawberry Concentrate Reviewed') }] });
-    const water = (await call('production', 'GET', '/api/materials')).body.find((m: any) => m.code === 'water');
-    await call('production', 'POST', `/api/materials/${water.id}/prices`, { effectiveDate: '2026-10-01', entryMode: 'per_unit', price: '0.05', currency: 'SEK' });
     const ap = await call('production', 'POST', `/api/imports/${pv.body.ids[0]}/apply`, { decisions: { labourChoice: 'fixed', waterQty: '850', waterUnit: 'mL', confirmed: true } });
     expect(ap.status).toBe(200);
+    const water = (await call('production', 'GET', '/api/materials')).body.find((m: any) => m.code === 'water');
+    await call('production', 'POST', `/api/materials/${water.id}/prices`, { effectiveDate: '2026-10-01', entryMode: 'per_unit', price: '0.05', currency: 'SEK' });
     const fmt = (await call('production', 'GET', `/api/products/${ap.body.productId}`)).body.packagingFormats[0];
     const c = await call('production', 'POST', '/api/costings/calculate', { recipeVersionId: ap.body.recipeVersionId, packagingFormatId: fmt.id });
     expect(c.body.packagedUnits).toBe('50');
@@ -358,5 +360,19 @@ describe('review fixes: leaks and locks', () => {
     const ap = await call('admin', 'POST', `/api/quotations/${d.body.id}/approve`);
     expect(ap.status).toBe(409);
     expect(ap.body.error).toMatch(/price has changed/);
+  });
+});
+
+describe('batch-specific costs', () => {
+  it('labour entered for a batch is added to that batch only', async () => {
+    const base = await call('production', 'POST', '/api/costings/calculate', { recipeVersionId: versionId, packagingFormatId: formatId });
+    const withLabour = await call('production', 'POST', '/api/costings/calculate', { recipeVersionId: versionId, packagingFormatId: formatId, extraCosts: [{ category: 'labour', description: '2 operators', amount: '1200' }] });
+    expect(Number(withLabour.body.totalBatchCost) - Number(base.body.totalBatchCost)).toBe(1200);
+    expect(withLabour.body.sections.labour).toBe('1200');
+    const b = await call('production', 'POST', '/api/batches', { productId, packagingFormatId: formatId, plannedQty: '100', extraCosts: [{ category: 'labour', description: 'Shift', amount: '900' }] });
+    expect(b.status).toBe(200);
+    expect(b.body.estimate.result.sections.labour).toBe('900');
+    const v = await call('production', 'GET', `/api/recipe-versions/${versionId}`);
+    expect(v.body.costItems).toHaveLength(0); // recipe itself unchanged
   });
 });

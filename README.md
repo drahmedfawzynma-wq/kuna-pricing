@@ -44,8 +44,8 @@ To stop the background service: `./scripts/uninstall-mac.sh` (data and backups a
    cd ~/Documents/Projects/kuna-pricing && npm run import
    ```
    Or use **Imports** → drop the Batchworks materials CSV and all recipe CSVs together (copies are in `sample-data/`) → review each preview → apply.
-3. **Materials** → price anything flagged (Water has no price until you enter one).
-4. **Recipes** → finish items marked *Needs review* (water quantity, labour basis) → mark reviewed → approve.
+3. **Recipes** → check each draft → approve.
+4. **Batch calculator** → add labour for the batch under *Costs for this batch*.
 5. **Batch calculator**, **Pricing**, **Quotations** as needed.
 
 ## Configuration (environment variables)
@@ -100,8 +100,7 @@ No secrets are stored in code. Passwords are hashed with scrypt; sessions are ra
 Original values are stored unchanged on every imported record (visible under "Imported data"). Findings from the supplied files:
 
 * Each export lists quantities for a **1 L reference batch** and multiplies costs by "Sellable units" (= litres produced). Imported as reference batch 1 L with that production scale as the default.
-* No water line exists; a Water ingredient is added with the quantity left for you to enter.
-* Labour (rate 1, hours 1000) must be resolved: fixed amount, reversed, as exported, or excluded.
+* No water is added to recipes. Labour from the export is not imported by default; enter labour per batch instead (batch calculator → *Costs for this batch*, or on the production batch record, planned and actual).
 * Packaging "per unit" 50 is the batch total; proposed as 1 per package with a 1 L fill (confirm).
 * Price warnings: undated or outdated exchange rates, pack price equal to unit price, and same invoice amounts in different currencies for similarly named items (B12 / V B12, Stevia / Stevia 97 %).
 

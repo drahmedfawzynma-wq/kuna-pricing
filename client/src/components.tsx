@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
 import { COST_CATEGORIES, type CostingResult } from '../../shared/engine';
 import { num, pct, qty, sek } from './format';
-import { Badge, Warnings } from './ui';
+import { Badge, Button, NumInput, Warnings } from './ui';
 
 export interface MaterialOption { id: number; code: string; name: string; baseUnit: string; category: string; archived?: boolean; currentPrice?: { landedUnitPriceSek: string } | null; reviewStatus?: string }
 
@@ -169,3 +169,30 @@ export function ProductCostChart({ rows, unitLabel, onSelect }: { rows: { id: nu
     </ResponsiveContainer>
   );
 }
+
+export type BatchCostRow = { category: string; description: string; amount: string };
+export const BATCH_COST_CATEGORIES: Record<string, string> = {
+  labour: 'Labour', setup_cleaning: 'Setup and cleaning', testing: 'Quality testing', utilities_equipment: 'Utilities and equipment', consumable: 'Consumables', other: 'Other',
+};
+
+/** Costs entered for one specific batch (e.g. labour), added as fixed amounts on top of the recipe. */
+export function BatchCostsEditor({ rows, onChange, disabled }: { rows: BatchCostRow[]; onChange: (rows: BatchCostRow[]) => void; disabled?: boolean }) {
+  const set = (i: number, patch: Partial<BatchCostRow>) => onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      {rows.map((r, i) => (
+        <div key={i} className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+          <select className="input input-sm" style={{ width: 170 }} disabled={disabled} value={r.category} onChange={(e) => set(i, { category: e.target.value })}>
+            {Object.entries(BATCH_COST_CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <input className="input input-sm" disabled={disabled} value={r.description} placeholder="e.g. 2 operators × 3 h" onChange={(e) => set(i, { description: e.target.value })} />
+          <NumInput className="input-sm" style={{ width: 120 }} disabled={disabled} value={r.amount} placeholder="SEK" onChange={(v) => set(i, { amount: v })} />
+          {!disabled && <button className="icon-btn" title="Remove" onClick={() => onChange(rows.filter((_, j) => j !== i))}>×</button>}
+        </div>
+      ))}
+      {!disabled && <div><Button size="sm" onClick={() => onChange([...rows, { category: 'labour', description: '', amount: '' }])}>{rows.length ? 'Add another cost' : 'Add labour or other batch cost'}</Button></div>}
+    </div>
+  );
+}
+
+export const validBatchCosts = (rows: BatchCostRow[]) => rows.filter((r) => r.amount !== '').map((r) => ({ category: r.category, description: r.description, amount: r.amount.replace(',', '.') }));

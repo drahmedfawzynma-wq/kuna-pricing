@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { Alert, Badge, Button, Card, Empty, Field, Loading, Modal, NumInput, PageHeader, StatusBadge, useAction, useConfirm, useLoad } from '../ui';
-import { CostBreakdown } from '../components';
+import { BATCH_COST_CATEGORIES, BatchCostsEditor, CostBreakdown, validBatchCosts, type BatchCostRow } from '../components';
 import { date, dateTime, num, qty, sek, todayIso } from '../format';
 import { dec } from '../../../shared/decimal';
 
@@ -39,11 +39,12 @@ export default function Batches() {
 function NewBatch({ onClose, onCreated }: { onClose: () => void; onCreated: (id: number) => void }) {
   const products = useLoad<any[]>('/api/products');
   const [f, setF] = useState<any>({ productId: '', packagingFormatId: '', plannedQty: '', productionDate: todayIso(), expiryDate: '', batchNumber: '' });
+  const [costs, setCosts] = useState<BatchCostRow[]>([{ category: 'labour', description: 'Production labour', amount: '' }]);
   const { run, busy } = useAction();
   const prod = products.data?.find((p) => p.id === Number(f.productId));
   return (
     <Modal title="Plan production batch" onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !f.productId || !f.plannedQty} onClick={async () => {
-      const r = await run(() => api.post('/api/batches', { productId: Number(f.productId), packagingFormatId: f.packagingFormatId ? Number(f.packagingFormatId) : null, plannedQty: f.plannedQty, productionDate: f.productionDate || null, expiryDate: f.expiryDate || null, batchNumber: f.batchNumber || null }), 'Batch planned; estimate snapshot stored');
+      const r = await run(() => api.post('/api/batches', { productId: Number(f.productId), packagingFormatId: f.packagingFormatId ? Number(f.packagingFormatId) : null, plannedQty: f.plannedQty, productionDate: f.productionDate || null, expiryDate: f.expiryDate || null, batchNumber: f.batchNumber || null, extraCosts: validBatchCosts(costs) }), 'Batch planned; estimate snapshot stored');
       if (r) onCreated(r.id);
     }}>Plan batch</Button></>}>
       <div className="form-grid">
@@ -54,6 +55,7 @@ function NewBatch({ onClose, onCreated }: { onClose: () => void; onCreated: (id:
         <Field label="Production date"><input type="date" className="input" value={f.productionDate} onChange={(e) => setF({ ...f, productionDate: e.target.value })} /></Field>
         <Field label="Expiry date"><input type="date" className="input" value={f.expiryDate} onChange={(e) => setF({ ...f, expiryDate: e.target.value })} /></Field>
       </div>
+      <div style={{ marginTop: 14 }}><div className="field-label" style={{ marginBottom: 6 }}>Planned labour and other costs for this batch (SEK, optional)</div><BatchCostsEditor rows={costs} onChange={setCosts} /></div>
       <p className="muted small">Uses the product's current recipe version (approved if one exists). The estimate is saved as a snapshot with today's material prices.</p>
     </Modal>
   );
@@ -107,9 +109,9 @@ function BatchDetail({ id, onChanged }: { id: number; onChanged: () => void }) {
                 <Field label="Production date"><input type="date" className="input" value={act.productionDate} onChange={(e) => setAct({ ...act, productionDate: e.target.value })} /></Field>
                 <Field label="Expiry date"><input type="date" className="input" value={act.expiryDate} onChange={(e) => setAct({ ...act, expiryDate: e.target.value })} /></Field>
               </div>
-              <div><div className="field-label">Additional actual costs (SEK), e.g. overtime, re-filtration</div>
-                {act.actualAdjustments.map((a: any, i: number) => <div key={i} className="row" style={{ gap: 6, marginTop: 4, flexWrap: 'nowrap' }}><input className="input input-sm" value={a.label} onChange={(e) => setAct({ ...act, actualAdjustments: act.actualAdjustments.map((x: any, j: number) => j === i ? { ...x, label: e.target.value } : x) })} placeholder="Description" /><NumInput className="input-sm" style={{ width: 120 }} value={a.amount} onChange={(v) => setAct({ ...act, actualAdjustments: act.actualAdjustments.map((x: any, j: number) => j === i ? { ...x, amount: v } : x) })} /><button className="icon-btn" onClick={() => setAct({ ...act, actualAdjustments: act.actualAdjustments.filter((_: any, j: number) => j !== i) })}>×</button></div>)}
-                <Button size="sm" style={{ marginTop: 6 }} onClick={() => setAct({ ...act, actualAdjustments: [...act.actualAdjustments, { label: '', amount: '' }] })}>Add cost</Button></div>
+              <div><div className="field-label">Additional actual costs (SEK), e.g. labour actually used, overtime, re-filtration</div>
+                {act.actualAdjustments.map((a: any, i: number) => <div key={i} className="row" style={{ gap: 6, marginTop: 4, flexWrap: 'nowrap' }}><select className="input input-sm" style={{ width: 150 }} value={a.category ?? 'labour'} onChange={(e) => setAct({ ...act, actualAdjustments: act.actualAdjustments.map((x: any, j: number) => j === i ? { ...x, category: e.target.value } : x) })}>{Object.entries(BATCH_COST_CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select><input className="input input-sm" value={a.label} onChange={(e) => setAct({ ...act, actualAdjustments: act.actualAdjustments.map((x: any, j: number) => j === i ? { ...x, label: e.target.value } : x) })} placeholder="Description" /><NumInput className="input-sm" style={{ width: 120 }} value={a.amount} onChange={(v) => setAct({ ...act, actualAdjustments: act.actualAdjustments.map((x: any, j: number) => j === i ? { ...x, amount: v } : x) })} /><button className="icon-btn" onClick={() => setAct({ ...act, actualAdjustments: act.actualAdjustments.filter((_: any, j: number) => j !== i) })}>×</button></div>)}
+                <Button size="sm" style={{ marginTop: 6 }} onClick={() => setAct({ ...act, actualAdjustments: [...act.actualAdjustments, { category: 'labour', label: '', amount: '' }] })}>Add cost</Button></div>
               <div className="row">
                 <Button disabled={busy} onClick={async () => done(await run(() => api.patch(`/api/batches/${id}`, { actualOutputQty: act.actualOutputQty || null, actualPackagedUnits: act.actualPackagedUnits || null, actualAdjustments: act.actualAdjustments.filter((a: any) => a.label), productionDate: act.productionDate || null, expiryDate: act.expiryDate || null }), 'Actuals saved'))}>Save actuals</Button>
                 {can('costs.read') && <Button kind="primary" disabled={busy || !b.actualOutputQty} onClick={async () => { if (await confirm({ title: 'Lock actual costs?', body: 'Calculates the actual cost with this batch\'s snapshot prices, the actual output and the extra costs, and freezes it. Save actuals first.', confirmText: 'Lock costs' })) done(await run(() => api.post(`/api/batches/${id}/complete-costing`), 'Actual costs locked')); }}>Lock actual costs</Button>}

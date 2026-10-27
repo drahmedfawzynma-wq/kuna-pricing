@@ -164,7 +164,6 @@ function CostingReview({ data, onApplied }: { data: any; onApplied: () => void }
                 <td className="num">{l.currentPrice ? num(l.currentPrice, 4) : <span className="muted">—</span>}</td>
               </tr>);
           })}
-            <tr className="row-missing"><td>Water <Badge tone="warn">added</Badge></td><td colSpan={7} className="small muted">Not in the export. Enter the quantity per reference batch below.</td></tr>
           </tbody>
         </table></div>
       </div>
@@ -179,10 +178,6 @@ function CostingReview({ data, onApplied }: { data: any; onApplied: () => void }
           <Field label={`Default production batch (${unit})`} hint={scale ? `Calculator scales recipe quantities ×${num(scale, 4)} once.` : undefined}><NumInput value={d.defaultBatchQty} disabled={!isPreview} onChange={(v) => set('defaultBatchQty', v)} /></Field>
           <Field label="Expected yield (%)" hint="Export shows 100 %: no losses recorded."><NumInput value={d.yieldPct} disabled={!isPreview} onChange={(v) => set('yieldPct', v)} /></Field>
           <Field label="Target gross margin (%)" hint="Optional; not an approved price."><NumInput value={d.targetMarginPct ?? ''} disabled={!isPreview} onChange={(v) => set('targetMarginPct', v || null)} /></Field>
-          <Field label="Water per reference batch" hint="Blank keeps the recipe incomplete.">
-            <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><NumInput value={d.waterQty ?? ''} disabled={!isPreview} onChange={(v) => set('waterQty', v || null)} />
-              <select className="input" style={{ width: 70 }} value={d.waterUnit} disabled={!isPreview} onChange={(e) => set('waterUnit', e.target.value)}>{['mL', 'L', 'g', 'kg'].map((u) => <option key={u}>{u}</option>)}</select></div>
-          </Field>
         </div>
 
         {lab && (
@@ -190,11 +185,11 @@ function CostingReview({ data, onApplied }: { data: any; onApplied: () => void }
             <div className="field-label">Labour “{lab.name}”: export shows rate {lab.rate} SEK and {lab.hours} hours ({lab.cost} SEK)</div>
             <div className="stack" style={{ gap: 6, marginTop: 6 }}>
               {[
+                ['exclude', 'Do not import labour (enter labour per batch instead)'],
                 ['unresolved', 'Decide later (costing stays incomplete, original values kept)'],
                 ['fixed', `Fixed ${lab.cost} SEK per batch (does not scale with batch size)`],
                 ['swapped', `Rate and hours reversed: ${lab.hours} SEK/h × ${lab.rate} h per batch`],
                 ['rate_x_hours', `As exported: ${lab.rate} SEK/h × ${lab.hours} h`],
-                ['exclude', 'Do not import labour'],
               ].map(([k, label]) => <label key={k} className="check"><input type="radio" disabled={!isPreview} checked={d.labourChoice === k} onChange={() => set('labourChoice', k)} /> {label}</label>)}
             </div>
           </div>
@@ -212,7 +207,7 @@ function CostingReview({ data, onApplied }: { data: any; onApplied: () => void }
         )}
 
         <label className="check" style={{ marginTop: 14 }}><input type="checkbox" disabled={!isPreview} checked={d.confirmed} onChange={(e) => set('confirmed', e.target.checked)} /> I confirm the batch, unit and packaging interpretation above.</label>
-        <div className="muted small" style={{ marginTop: 4 }}>The recipe is imported as a draft. It stays <strong>Needs review</strong> until this is confirmed, water is entered and labour is resolved. You can finish any of these later in the recipe editor.</div>
+        <div className="muted small" style={{ marginTop: 4 }}>The recipe is imported as a draft. It stays <strong>Needs review</strong> until this is confirmed. Labour is not part of the recipe by default: enter it per production batch in the batch calculator or on the batch record.</div>
       </Card>
 
       {isPreview ? (

@@ -287,11 +287,10 @@ export function analyzeBatchworksCosting(db: DB, text: string, pendingMaterialNa
   if (sellable && planned && yieldPct && refQty && !sellable.eq(planned.times(yieldPct).div(100))) {
     issues.push({ level: 'info', field: 'Sellable units', message: `Header shows ${h['Planned units']} planned unit(s) at ${h['Yield %']}% yield but ${h['Sellable units']} sellable units. Per your confirmation, "Sellable units" is treated as the litres produced, not packages.` });
   }
-  issues.push({ level: 'warning', field: 'Ingredients', message: 'No water line in the export. A Water ingredient is added; enter its quantity per reference batch (left blank = costing incomplete).' });
 
   if (!parsed.labour.length) issues.push({ level: 'info', field: 'Labor', message: 'No labour recorded. Costs are ingredients (and packaging) only until labour, testing and overhead are added.' });
   for (const l of parsed.labour) {
-    issues.push({ level: 'warning', field: 'Labor', message: `Labour "${l.name}": rate ${l.rate} SEK and ${l.hours} hours (cost ${l.cost} SEK). The rate and hours may be reversed. Choose how to import it.` });
+    issues.push({ level: 'info', field: 'Labor', message: `Labour "${l.name}" (rate ${l.rate} SEK, ${l.hours} h, ${l.cost} SEK) is not imported by default: labour is entered per production batch. The original values are kept for reference.` });
   }
   if (!parsed.packaging.length) issues.push({ level: 'info', field: 'Packaging', message: 'No packaging in the export. Add a packaging format before quoting packaged units.' });
   for (const p of parsed.packaging) {
@@ -347,7 +346,7 @@ export function analyzeBatchworksCosting(db: DB, text: string, pendingMaterialNa
     proposed: {
       productCode, productName: parsed.productName, referenceBatchQty: refQty ?? '1', defaultBatchQty: defaultBatch.toFixed(),
       yieldPct: yieldPct?.toFixed() ?? '100', targetMarginPct: margin && margin.gt(0) ? margin.toFixed() : null,
-      labourChoice: 'unresolved',
+      labourChoice: 'exclude',
       packagingName: pkg ? `${pkg.name}${fillDefault ? ` (${str(fillDefault)} ${refUnit} fill)` : ''}` : '',
       fillQty: fillDefault ? str(fillDefault) : null, fillUnit: (refUnit === 'kg' ? 'kg' : 'L') as QtyUnit,
       qtyPerPackage: pkg ? '1' : null, waterQty: null, waterUnit: 'mL', confirmed: false, materialMap,

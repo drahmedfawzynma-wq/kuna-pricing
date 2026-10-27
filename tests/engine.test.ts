@@ -203,3 +203,26 @@ describe('review fixes', () => {
     expect(r.complete).toBe(false);
   });
 });
+
+describe('migration 003 cleanup', () => {
+  it('removes placeholder water and unresolved labour from imported drafts only', async () => {
+    const { DB } = await import('../server/db');
+    const db = new DB(':memory:');
+    const all = (await import('node:fs')).readdirSync(new URL('../server/migrations', import.meta.url)).sort();
+    const fs = await import('node:fs');
+    for (const f of all.filter((x: string) => x < '003')) db.raw.exec(fs.readFileSync(new URL(`../server/migrations/${f}`, import.meta.url), 'utf8'));
+    db.raw.exec(`INSERT INTO products (id, code, name) VALUES (1,'p','P');
+      INSERT INTO import_batches (id, kind, raw_text) VALUES (1,'batchworks_costing','x');
+      INSERT INTO materials (id, code, name, base_unit) VALUES (1,'water','Water','L'), (2,'acid','Acid','kg');
+      INSERT INTO recipe_versions (id, product_id, version_no, status, import_batch_id, review_status, review_notes) VALUES
+        (1,1,1,'draft',1,'needs_review','Water quantity per reference batch not entered.' || char(10) || 'Labour rate/hours interpretation unresolved.'),
+        (2,1,2,'approved',1,'ok',NULL);
+      INSERT INTO recipe_ingredients (recipe_version_id, line_no, material_id, quantity, unit, needs_review) VALUES (1,1,2,'5','g',0),(1,2,1,NULL,'mL',1),(2,1,1,NULL,'mL',1);
+      INSERT INTO recipe_cost_items (recipe_version_id, line_no, category, basis, rate, needs_review) VALUES (1,1,'labour','per_hour',NULL,1);`);
+    db.raw.exec(fs.readFileSync(new URL('../server/migrations/003_remove_imported_water_and_labour.sql', import.meta.url), 'utf8'));
+    expect(db.all('SELECT * FROM recipe_ingredients WHERE recipe_version_id = 1')).toHaveLength(1);
+    expect(db.all('SELECT * FROM recipe_ingredients WHERE recipe_version_id = 2')).toHaveLength(1); // approved untouched
+    expect(db.all('SELECT * FROM recipe_cost_items')).toHaveLength(0);
+    expect(db.get<any>('SELECT review_status, review_notes FROM recipe_versions WHERE id = 1')).toEqual({ review_status: 'ok', review_notes: null });
+  });
+});

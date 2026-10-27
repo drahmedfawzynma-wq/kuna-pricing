@@ -88,6 +88,7 @@ export interface CostingRequest {
   priceOverrides?: Record<number, string>;
   actualOutputQty?: string | null;
   actualPackagedUnits?: string | null;
+  extraCosts?: CostingInput['extraCosts'];
   /** Use a recipe passed in (draft edits / scenario formulation) instead of the stored one. */
   recipeOverride?: RecipeForCosting;
 }
@@ -108,6 +109,7 @@ export function runCosting(db: DB, req: CostingRequest): { input: CostingInput; 
     priceOverrides: req.priceOverrides,
     actualOutputQty: req.actualOutputQty ?? null,
     actualPackagedUnits: req.actualPackagedUnits ?? null,
+    extraCosts: req.extraCosts?.length ? req.extraCosts : undefined,
   };
   if (v.review_status === 'needs_review') {
     // Surface but do not block: imported records remain usable while under review.
