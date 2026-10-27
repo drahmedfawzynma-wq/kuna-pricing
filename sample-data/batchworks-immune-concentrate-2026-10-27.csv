@@ -1,0 +1,30 @@
+Batchworks costing,Immune Concentrate
+Subtitle,Functional concentrate
+Batch,1 L
+Planned units,1
+Yield %,100.0
+Sellable units,1.5
+Currency,SEK
+Price basis,current
+Exported,2026-10-27
+
+Ingredients,Quantity,Unit,Unit price (SEK),Per,Cost (SEK)
+Citrus Bioflavonoids,20.0,g,741.302,kg,22.24
+Vitamin C,10.0,g,292.1602,kg,4.38
+Sodium Bicarbonate,10.0,g,610.484,kg,9.16
+Propylene Glycol,50.0,g,392.454,kg,29.43
+
+Packaging,Per unit,Unit price (SEK),Per,Cost (SEK)
+
+Labor,Rate (SEK),Hours,Cost (SEK)
+
+Ingredients,65.21,100.0%
+Packaging,0.0,0.0%
+Labor,0.0,0.0%
+Sub-recipes,0.0,0.0%
+Overhead (0.0%),0.0
+Batch total,65.21
+Cost / unit,43.475
+Sell price (margin 0.0%),43.48
+Profit / unit,0.0
+Profit / batch,0.0

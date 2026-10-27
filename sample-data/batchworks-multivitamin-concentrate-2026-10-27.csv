@@ -1,0 +1,32 @@
+Batchworks costing,Multivitamin Concentrate
+Subtitle,Functional concentrate
+Batch,1 L
+Planned units,1
+Yield %,100.0
+Sellable units,1.0
+Currency,SEK
+Price basis,current
+Exported,2026-10-27
+
+Ingredients,Quantity,Unit,Unit price (SEK),Per,Cost (SEK)
+Citric Acid,5.0,g,58.8681,kg,0.294
+Vitamin C,40.0,g,292.1602,kg,11.69
+Potassium Sorbate,1.0,g,610.484,kg,0.61
+V B3,2.5,g,354.29875,kg,0.886
+V B6,2.5,g,518.9114,kg,1.3
+V B12,2.5,g,1951.04146,kg,4.88
+
+Packaging,Per unit,Unit price (SEK),Per,Cost (SEK)
+
+Labor,Rate (SEK),Hours,Cost (SEK)
+
+Ingredients,19.65,100.0%
+Packaging,0.0,0.0%
+Labor,0.0,0.0%
+Sub-recipes,0.0,0.0%
+Overhead (0.0%),0.0
+Batch total,19.65
+Cost / unit,19.652
+Sell price (margin 0.0%),19.65
+Profit / unit,0.0
+Profit / batch,0.0

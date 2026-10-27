@@ -1,0 +1,35 @@
+Batchworks costing,Focus Concentrate
+Subtitle,Functional concentrate
+Batch,1 L
+Planned units,1
+Yield %,100.0
+Sellable units,1.5
+Currency,SEK
+Price basis,current
+Exported,2026-10-27
+
+Ingredients,Quantity,Unit,Unit price (SEK),Per,Cost (SEK)
+Citric Acid,100.0,g,58.8681,kg,8.83
+GTE (LT),200.0,g,675.893,kg,202.77
+Caffeine,40.0,g,926.6275,kg,55.6
+GTE,6.0,g,632.287,kg,5.69
+V B3,1.25,g,354.29875,kg,0.664
+V B6,1.25,g,518.9114,kg,0.973
+V B12,1.25,g,1951.04146,kg,3.66
+Citrus Bioflavonoids,1.0,g,741.302,kg,1.11
+Potassium Sorbate,1.0,g,610.484,kg,0.916
+
+Packaging,Per unit,Unit price (SEK),Per,Cost (SEK)
+
+Labor,Rate (SEK),Hours,Cost (SEK)
+
+Ingredients,280.21,100.0%
+Packaging,0.0,0.0%
+Labor,0.0,0.0%
+Sub-recipes,0.0,0.0%
+Overhead (0.0%),0.0
+Batch total,280.21
+Cost / unit,186.806
+Sell price (margin 70.0%),622.69
+Profit / unit,435.88
+Profit / batch,653.82

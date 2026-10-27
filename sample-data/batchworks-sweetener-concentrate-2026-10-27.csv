@@ -1,0 +1,29 @@
+Batchworks costing,Sweetener Concentrate
+Subtitle,Sweetener concentrate
+Batch,1 L
+Planned units,1
+Yield %,100.0
+Sellable units,1.0
+Currency,SEK
+Price basis,current
+Exported,2026-10-27
+
+Ingredients,Quantity,Unit,Unit price (SEK),Per,Cost (SEK)
+Stevia 97% Rebaudioside A,5.0,g,730.4005,kg,3.65
+Xylitol,100.0,g,381.5525,kg,38.16
+Erythritol,100.0,g,218.03,kg,21.8
+
+Packaging,Per unit,Unit price (SEK),Per,Cost (SEK)
+
+Labor,Rate (SEK),Hours,Cost (SEK)
+
+Ingredients,63.61,100.0%
+Packaging,0.0,0.0%
+Labor,0.0,0.0%
+Sub-recipes,0.0,0.0%
+Overhead (0.0%),0.0
+Batch total,63.61
+Cost / unit,63.61
+Sell price (margin 0.0%),63.61
+Profit / unit,0.0
+Profit / batch,0.0

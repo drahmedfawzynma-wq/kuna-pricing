@@ -1,0 +1,45 @@
+{
+  "name": "kuna-production-pricing",
+  "version": "0.1.0",
+  "description": "Kuna Production & Pricing: recipes, batch costing, pricing and quotations",
+  "scripts": {
+    "start": "node --no-warnings=ExperimentalWarning --import tsx server/index.ts",
+    "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "node --no-warnings=ExperimentalWarning --watch --import tsx server/index.ts",
+    "dev:client": "vite",
+    "build": "vite build",
+    "setup": "npm install && npm run build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "backup": "node --no-warnings=ExperimentalWarning --import tsx server/cli.ts backup",
+    "user": "node --no-warnings=ExperimentalWarning --import tsx server/cli.ts user"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@fastify/cookie": "^11.1.5",
+    "@fastify/static": "^10.1.7",
+    "decimal.js": "^10.6.0",
+    "fastify": "^5.12.7",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^10.0.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.4",
+    "recharts": "^3.10.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  },
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  }
+}

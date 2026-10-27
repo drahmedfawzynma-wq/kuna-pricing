@@ -1,0 +1,35 @@
+Batchworks costing,Strawberry Concentrate
+Subtitle,Flavour concentrate
+Batch,1 L
+Planned units,1
+Yield %,100.0
+Sellable units,50.0
+Currency,SEK
+Price basis,current
+Exported,2026-10-27
+
+Ingredients,Quantity,Unit,Unit price (SEK),Per,Cost (SEK)
+Citric Acid,25.0,g,58.8681,kg,73.59
+Gum Arabic,25.0,g,138.44905,kg,173.06
+Xanthan Gum,1.0,g,872.12,kg,43.61
+Strawberry/Pomegranate Flavor,100.0,g,347.75785,kg,1738.79
+Potassium Sorbate,1.0,g,610.484,kg,30.52
+
+Packaging,Per unit,Unit price (SEK),Per,Cost (SEK)
+1.5 L Tritan bottle,50.0,99.558,pc,4977.9
+External carton packaging,50.0,30.0,pc,1500.0
+Extract Label,50.0,10.0,pc,500.0
+
+Labor,Rate (SEK),Hours,Cost (SEK)
+Production,1.0,1000.0,1000.0
+
+Ingredients,2059.57,20.5%
+Packaging,6977.9,69.5%
+Labor,1000.0,10.0%
+Sub-recipes,0.0,0.0%
+Overhead (0.0%),0.0
+Batch total,10037.47
+Cost / unit,200.749
+Sell price (margin 70.0%),669.16
+Profit / unit,468.42
+Profit / batch,23420.75

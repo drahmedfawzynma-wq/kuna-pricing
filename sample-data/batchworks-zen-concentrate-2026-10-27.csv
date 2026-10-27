@@ -1,0 +1,32 @@
+Batchworks costing,Zen Concentrate
+Subtitle,Functional concentrate
+Batch,1 L
+Planned units,1
+Yield %,100.0
+Sellable units,1.0
+Currency,SEK
+Price basis,current
+Exported,2026-10-27
+
+Ingredients,Quantity,Unit,Unit price (SEK),Per,Cost (SEK)
+Citric Acid,50.0,g,58.8681,kg,2.94
+V B3,1.25,g,354.29875,kg,0.443
+V B6,1.25,g,518.9114,kg,0.649
+Potassium Sorbate,1.0,g,610.484,kg,0.61
+V B12,1.25,g,1951.04146,kg,2.44
+GTE (LT),125.0,g,675.893,kg,84.49
+
+Packaging,Per unit,Unit price (SEK),Per,Cost (SEK)
+
+Labor,Rate (SEK),Hours,Cost (SEK)
+
+Ingredients,91.57,100.0%
+Packaging,0.0,0.0%
+Labor,0.0,0.0%
+Sub-recipes,0.0,0.0%
+Overhead (0.0%),0.0
+Batch total,91.57
+Cost / unit,91.571
+Sell price (margin 85.0%),610.47
+Profit / unit,518.9
+Profit / batch,518.9

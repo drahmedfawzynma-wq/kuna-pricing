@@ -1,0 +1,33 @@
+Code,Name,Type,Supplier,Pack,Pack price (SEK),Unit price (SEK),Per,Purity (%),Price updated,Invoice amount,Invoice currency,Invoice date,Rate,Rate source,Previous price (SEK),Open quotes,Priced by
+b12,B12,raw,,,,1756.21471,kg,100.0000,2026-09-22,178.97000,USD,,9.8129000000,provider,,0,hani
+caffeine,Caffeine,raw,,,,926.62750,kg,100.0000,2025-05-19,85.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+citric-acid,Citric Acid,raw,,,,58.86810,kg,100.0000,2025-05-19,5.40000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+citrus-bioflavonoids,Citrus Bioflavonoids,raw,,,,741.30200,kg,100.0000,2025-05-19,68.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+erythritol,Erythritol,raw,,,,218.03000,kg,100.0000,2025-05-19,20.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+gte,GTE,raw,,,,632.28700,kg,100.0000,2025-05-19,58.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+gte-lt,GTE (LT),raw,,,,675.89300,kg,100.0000,2025-05-19,62.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+ginger-oil,Ginger Oil,raw,,,,14171.95000,kg,100.0000,2025-05-19,1300.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+ginger-extract-20,Ginger extract 20%,raw,"Shaanxi Jiuyuan Biotechnology Co.,Ltd",5,,1106.69917,kg,100.0000,2026-09-22,116.30000,USD,2025-10-10,9.5159000000,provider,,0,hani
+glycerol,Glycerol,raw,,,,218.03000,kg,100.0000,2025-05-19,20.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+gum-arabic,Gum Arabic,raw,,,,138.44905,kg,100.0000,2026-10-27,12.70000,EUR,2025-05-19,10.9015000000,provider,245.28375,0,ahmed
+l-maleic-acid,L-maleic acid,raw,,,,63.78385,kg,100.0000,2026-09-22,6.50000,USD,,9.8129000000,provider,,0,hani
+l-theanine,L-theanine,raw,,,,3817.21810,kg,100.0000,2026-09-22,389.00000,USD,,9.8129000000,provider,,0,hani
+lemon-orange-oil,Lemon/Orange Oil,raw,,,,8394.15500,kg,100.0000,2025-05-19,770.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+magnesium-malate,Magnesium malate,raw,,,,131.49286,kg,100.0000,2026-09-22,13.40000,USD,,9.8129000000,provider,,0,hani
+potassium-sorbate,Potassium Sorbate,raw,,,,610.48400,kg,100.0000,2025-05-19,56.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+propylene-glycol,Propylene Glycol,raw,,,,392.45400,kg,100.0000,2025-05-19,36.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+sodium-bicarbonate,Sodium Bicarbonate,raw,,,,610.48400,kg,100.0000,2025-05-19,56.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+stevia,Stevia,raw,,,,657.46430,kg,100.0000,2026-09-22,67.00000,USD,,9.8129000000,provider,,0,hani
+stevia-97-rebaudioside-a,Stevia 97% Rebaudioside A,raw,,,,730.40050,kg,100.0000,2025-05-19,67.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+strawberry-pomegranate-flavor,Strawberry/Pomegranate Flavor,raw,,,,347.75785,kg,100.0000,2026-10-27,31.90000,EUR,2025-05-19,10.9015000000,provider,771.82620,0,ahmed
+strawbery,Strawbery,raw,,,,694.75332,kg,100.0000,2026-09-22,70.80000,USD,,9.8129000000,provider,,0,hani
+turmeric-powder,Turmeric Powder,raw,,,,119.91650,kg,100.0000,2025-05-19,11.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+v-b12,V B12,raw,,,,1951.04146,kg,100.0000,2025-05-19,178.97000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+v-b3,V B3,raw,,,,354.29875,kg,100.0000,2025-05-19,32.50000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+v-b6,V B6,raw,,,,518.91140,kg,100.0000,2025-05-19,47.60000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+vitamin-c,Vitamin C,raw,,,,292.16020,kg,100.0000,2025-05-19,26.80000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+xanthan-gum,Xanthan Gum,raw,,,,872.12000,kg,100.0000,2025-05-19,80.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+xylitol,Xylitol,raw,,,,381.55250,kg,100.0000,2025-05-19,35.00000,EUR,2025-05-19,10.9015000000,provider,,0,hani
+1-5-l-tritan-bottle,1.5 L Tritan bottle,packaging,DGF,3000,99.5580,99.55800,pc,100.0000,2026-10-27,10.00000,USD,2026-10-27,9.9558000000,provider,,0,ahmed
+external-packaging,External carton packaging,packaging,,,30.0000,30.00000,pc,100.0000,2026-10-27,30.00000,SEK,,1.0000000000,identity,,0,ahmed
+extract-label,Extract Label,packaging,,,10.0000,10.00000,pc,100.0000,2026-10-27,10.00000,SEK,,1.0000000000,identity,,0,ahmed

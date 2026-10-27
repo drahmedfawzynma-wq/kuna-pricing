@@ -1,0 +1,30 @@
+Batchworks costing,Caffeine Concentrate
+Subtitle,Functional concentrate
+Batch,1 L
+Planned units,1
+Yield %,100.0
+Sellable units,1.0
+Currency,SEK
+Price basis,current
+Exported,2026-10-27
+
+Ingredients,Quantity,Unit,Unit price (SEK),Per,Cost (SEK)
+Citric Acid,50.0,g,58.8681,kg,2.94
+Caffeine,50.0,g,926.6275,kg,46.33
+Potassium Sorbate,1.0,g,610.484,kg,0.61
+GTE,6.0,g,632.287,kg,3.79
+
+Packaging,Per unit,Unit price (SEK),Per,Cost (SEK)
+
+Labor,Rate (SEK),Hours,Cost (SEK)
+
+Ingredients,53.68,100.0%
+Packaging,0.0,0.0%
+Labor,0.0,0.0%
+Sub-recipes,0.0,0.0%
+Overhead (0.0%),0.0
+Batch total,53.68
+Cost / unit,53.679
+Sell price (margin 0.0%),53.68
+Profit / unit,0.0
+Profit / batch,0.0
