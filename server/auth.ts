@@ -17,7 +17,9 @@ declare module 'fastify' {
 }
 
 export const SESSION_COOKIE = 'kuna_session';
-const SESSION_DAYS = 7;
+export const SESSION_DAYS = 7;
+export const REMEMBERED_SESSION_DAYS = 30;
+export const SHORT_SESSION_DAYS = 1;
 
 export function hashPassword(pw: string): string {
   const salt = crypto.randomBytes(16);
@@ -40,9 +42,9 @@ export function validatePassword(pw: unknown): string | null {
 
 const sha = (t: string) => crypto.createHash('sha256').update(t).digest('hex');
 
-export function createSession(db: DB, userId: number): string {
+export function createSession(db: DB, userId: number, days = SESSION_DAYS): string {
   const token = crypto.randomBytes(32).toString('base64url');
-  const expires = new Date(Date.now() + SESSION_DAYS * 86400_000).toISOString();
+  const expires = new Date(Date.now() + days * 86400_000).toISOString();
   db.run('INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)', sha(token), userId, expires);
   db.run("DELETE FROM sessions WHERE expires_at < ?", new Date().toISOString());
   return token;

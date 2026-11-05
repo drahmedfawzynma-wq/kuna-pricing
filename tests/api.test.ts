@@ -42,6 +42,23 @@ beforeAll(async () => {
   await login('quality', 'quality@kuna.test', 'quality-password-1');
   await login('sales', 'sales@kuna.test', 'sales-password-1');
 });
+
+describe('sign in', () => {
+  const signIn = (payload: object) => app.inject({ method: 'POST', url: '/api/auth/login', payload: payload as any, headers: { 'x-kuna-request': '1' } });
+  const cookieOf = (res: any) => { const c = res.headers['set-cookie']; return (Array.isArray(c) ? c[0] : c) as string; };
+
+  it('keeps a remembered session for 30 days', async () => {
+    const res = await signIn({ email: 'admin@kuna.test', password: 'admin-password-1', remember: true });
+    expect(res.statusCode).toBe(200);
+    expect(cookieOf(res)).toContain(`Max-Age=${30 * 86400}`);
+  });
+
+  it('ends the session with the browser when not remembered', async () => {
+    const res = await signIn({ email: 'admin@kuna.test', password: 'admin-password-1', remember: false });
+    expect(res.statusCode).toBe(200);
+    expect(cookieOf(res)).not.toContain('Max-Age');
+  });
+});
 afterAll(async () => { await app.close(); });
 
 describe('security basics', () => {

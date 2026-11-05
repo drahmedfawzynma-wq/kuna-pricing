@@ -222,6 +222,11 @@ pre.raw { background: var(--surface-2); border: 1px solid var(--line); border-ra
 /* Login */
 .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
 .login { width: 100%; max-width: 380px; }
+.password-wrap { position: relative; display: block; }
+.password-wrap .input { padding-right: 56px; }
+.password-toggle { position: absolute; top: 3px; right: 3px; height: 26px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: var(--accent-2); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; }
+.password-toggle:hover { background: var(--accent-soft); }
+.check-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
 
 /* Print */
 .print-page { max-width: 820px; margin: 0 auto; background: #fff; padding: 40px 48px; color: #111; }

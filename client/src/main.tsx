@@ -22,19 +22,40 @@ import Settings from './pages/Settings';
 import Outsourced from './pages/Outsourced';
 
 
+const REMEMBERED_EMAIL_KEY = 'kuna.rememberedEmail';
+
+// Only the email is kept here. The password is never stored by the app; saving it is left to the browser.
+function readRememberedEmail(): string {
+  try { return localStorage.getItem(REMEMBERED_EMAIL_KEY) ?? ''; } catch { return ''; }
+}
+
+function writeRememberedEmail(email: string | null) {
+  try {
+    if (email) localStorage.setItem(REMEMBERED_EMAIL_KEY, email);
+    else localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+  } catch { /* the app works without browser storage */ }
+}
+
 function Login({ needsSetup, onDone }: { needsSetup: boolean; onDone: () => void }) {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(readRememberedEmail);
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setErr(null);
+    // Hide it again on submit: browsers offer to save a password only from a password field.
+    setShowPassword(false);
     try {
       if (needsSetup) await api.post('/api/auth/setup', { email, name, password });
-      else await api.post('/api/auth/login', { email, password });
+      else {
+        await api.post('/api/auth/login', { email, password, remember });
+        writeRememberedEmail(remember ? email : null);
+      }
       onDone();
     } catch (x: any) {
       setErr(x.message);
@@ -50,7 +71,13 @@ function Login({ needsSetup, onDone }: { needsSetup: boolean; onDone: () => void
             <div><h1 style={{ fontSize: 18 }}>Kuna Production &amp; Pricing</h1><div className="muted small">{needsSetup ? 'First-time setup: create the administrator account' : 'Sign in'}</div></div></div>
           {needsSetup && <Field label="Your name"><input className="input" value={name} onChange={(e) => setName(e.target.value)} required /></Field>}
           <Field label="Email"><input className="input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
-          <Field label="Password" hint={needsSetup ? 'At least 10 characters.' : undefined}><input className="input" type="password" autoComplete={needsSetup ? 'new-password' : 'current-password'} value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
+          <Field label="Password" hint={needsSetup ? 'At least 10 characters.' : undefined}>
+            <span className="password-wrap">
+              <input className="input" type={showPassword ? 'text' : 'password'} autoComplete={needsSetup ? 'new-password' : 'current-password'} value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <button type="button" className="password-toggle" aria-pressed={showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword((v) => !v)}>{showPassword ? 'Hide' : 'Show'}</button>
+            </span>
+          </Field>
+          {!needsSetup && <label className="check-row"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /><span>Remember me on this computer</span></label>}
           {err && <Alert tone="error">{err}</Alert>}
           <button className="btn btn-primary" type="submit" disabled={busy}>{needsSetup ? 'Create administrator' : 'Sign in'}</button>
         </div>

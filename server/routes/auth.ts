@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
-  createSession, destroySession, hashPassword, HttpError, requirePerm, SESSION_COOKIE, validatePassword, verifyPassword,
+  createSession, destroySession, hashPassword, HttpError, REMEMBERED_SESSION_DAYS, requirePerm, SESSION_COOKIE, SHORT_SESSION_DAYS, validatePassword, verifyPassword,
 } from '../auth';
 import { audit } from '../services';
 import { ROLE_PERMISSIONS, ROLES } from '../../shared/permissions';
@@ -34,7 +34,7 @@ export function registerAuthRoutes(app: FastifyInstance) {
 
   const attempts = new Map<string, { n: number; until: number }>();
   app.post('/api/auth/login', async (req, reply) => {
-    const body = z.object({ email: z.string(), password: z.string() }).parse(req.body);
+    const body = z.object({ email: z.string(), password: z.string(), remember: z.boolean().optional() }).parse(req.body);
     const key = `${req.ip}:${body.email.toLowerCase()}`;
     const a = attempts.get(key);
     if (a && a.n >= 5 && a.until > Date.now()) throw new HttpError(429, 'Too many failed attempts. Try again in a few minutes.');
@@ -44,7 +44,9 @@ export function registerAuthRoutes(app: FastifyInstance) {
       throw new HttpError(401, 'Incorrect email or password.');
     }
     attempts.delete(key);
-    reply.setCookie(SESSION_COOKIE, createSession(db, u.id), cookieOpts(app.secureCookies));
+    const { maxAge: _maxAge, ...browserSessionCookie } = cookieOpts(app.secureCookies);
+    if (body.remember) reply.setCookie(SESSION_COOKIE, createSession(db, u.id, REMEMBERED_SESSION_DAYS), { ...browserSessionCookie, maxAge: REMEMBERED_SESSION_DAYS * 86400 });
+    else reply.setCookie(SESSION_COOKIE, createSession(db, u.id, SHORT_SESSION_DAYS), browserSessionCookie);
     return { ok: true };
   });
 
